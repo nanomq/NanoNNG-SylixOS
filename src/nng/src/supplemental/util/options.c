@@ -16,10 +16,10 @@
 
 #include "../../core/nng_impl.h"
 
-// Call with optidx set to 1 to start parsing.
+// Call with opt_idx set to 1 to start parsing.
 int
 nng_opts_parse(int argc, char *const *argv, const nng_optspec *opts, int *val,
-    char **optarg, int *optidx)
+    char **opt_arg, int *opt_idx)
 {
 	const nng_optspec *opt;
 	int                matches;
@@ -28,16 +28,16 @@ nng_opts_parse(int argc, char *const *argv, const nng_optspec *opts, int *val,
 	char *             arg;
 	int                i;
 
-	if ((i = *optidx) >= argc) {
+	if ((i = *opt_idx) >= argc) {
 		return (-1);
 	}
-	arg = argv[*optidx];
+	arg = argv[*opt_idx];
 
 	if (arg[0] != '-') {
 		return (-1);
 	}
 	if (arg[1] == '\0') {
-		*optidx = i + 1;
+		*opt_idx = i + 1;
 		return (-1);
 	}
 
@@ -103,24 +103,24 @@ nng_opts_parse(int argc, char *const *argv, const nng_optspec *opts, int *val,
 			return (NNG_EINVAL);
 		}
 		*val    = opt->o_val;
-		*optidx = i + 1;
+		*opt_idx = i + 1;
 		return (0);
 	}
 
 	if (arg[l] != '\0') {
 		if (shortopt) {
-			*optarg = arg + l;
+			*opt_arg = arg + l;
 		} else {
-			*optarg = arg + l + 1;
+			*opt_arg = arg + l + 1;
 		}
 	} else {
 		i++;
 		if (i >= argc) {
 			return (NNG_ENOARG);
 		}
-		*optarg = argv[i];
+		*opt_arg = argv[i];
 	}
-	*optidx = ++i;
+	*opt_idx = ++i;
 	*val    = opt->o_val;
 
 	return (0);
