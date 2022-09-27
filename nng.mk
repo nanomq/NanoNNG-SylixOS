@@ -153,7 +153,7 @@ src/nng/src/supplemental/websocket/websocket.c
 #*********************************************************************************************************
 LOCAL_INC_PATH :=  \
 -I"./src/nng/include" \
--I"$(SYLIXOS_BASE_PATH)/libsqlite3/sqlite3"
+-I"$(WORKSPACE_SylixOS-Base)/libsqlite3/sqlite3"
 
 #*********************************************************************************************************
 # Pre-defined macro (eg. -DYOUR_MARCO=1)
@@ -171,11 +171,11 @@ LOCAL_LINKFLAGS :=
 # Depend library (eg. LOCAL_DEPEND_LIB := -la LOCAL_DEPEND_LIB_PATH := -L"Your library search path")
 #*********************************************************************************************************
 LOCAL_DEPEND_LIB :=  \
--lsqlite3 \
--lcextern
+-lcextern \
+-lsqlite3
 LOCAL_DEPEND_LIB_PATH :=  \
--L"$(SYLIXOS_BASE_PATH)/libsqlite3/$(Output)" \
--L"$(SYLIXOS_BASE_PATH)/libcextern/$(Output)"
+-L"$(SYLIXOS_BASE_PATH)/libcextern/$(Output)" \
+-L"$(SYLIXOS_BASE_PATH)/libsqlite3/$(Debug)"
 
 #*********************************************************************************************************
 # C++ config
@@ -210,8 +210,8 @@ LOCAL_POST_STRIP_CMD :=
 # Depend target
 #*********************************************************************************************************
 LOCAL_DEPEND_TARGET :=  \
-$(SYLIXOS_BASE_PATH)/libsqlite3/$(Output)/libsqlite3.so \
-$(SYLIXOS_BASE_PATH)/libcextern/$(Output)/libcextern.so
+$(SYLIXOS_BASE_PATH)/libcextern/$(Output)/libcextern.so \
+$(SYLIXOS_BASE_PATH)/libsqlite3/$(Debug)/libsqlite3.so
 
 include $(LIBRARY_MK)
 
