@@ -1,11 +1,14 @@
-#include "mqtt_qos_db.h"
 #include "../../core/nng_impl.h"
 #include "nng/nng.h"
-#include "sqlite3.h"
+
 #include "mqtt_msg.h"
 #include <string.h>
 #include <stdlib.h>
 
+#if defined(NNG_SUPP_SQLITE)
+#include "mqtt_qos_db.h"
+
+#include "sqlite3.h"
 #define table_main "t_main"
 #define table_msg "t_msg"
 #define table_pipe_client "t_pipe_client"
@@ -1324,3 +1327,5 @@ nni_mqtt_sqlite_db_fini(nni_mqtt_sqlite_option *sqlite_opt)
 		nni_mqtt_qos_db_close(sqlite_opt->db);
 	}
 }
+
+#endif
