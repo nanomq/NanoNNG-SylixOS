@@ -10,6 +10,8 @@
 
 #define NNG_PLATFORM_POSIX
 
+#define ENABLE_LOG
+
 #define NNG_HAVE_BUS0
 #define NNG_HAVE_PAIR0
 #define NNG_HAVE_PAIR1
