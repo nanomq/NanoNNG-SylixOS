@@ -49,14 +49,6 @@ static void conf_log_init(conf_log *log);
 static void conf_log_destroy(conf_log *log);
 static void conf_log_parse(conf_log *log, const char *path);
 
-#if defined(SUPP_RULE_ENGINE)
-static void conf_rule_repub_parse(conf_rule *cr, char *path);
-static void conf_rule_mysql_parse(conf_rule *cr, char *path);
-static bool conf_rule_sqlite_parse(conf_rule *cr, char *path);
-static void conf_rule_fdb_parse(conf_rule *cr, char *path);
-static void conf_rule_parse(conf_rule *rule, const char *path);
-#endif
-
 static char *
 strtrim(char *str, size_t len)
 {
@@ -534,11 +526,6 @@ conf_parse(conf *nanomq_conf)
 	conf_log_parse(&config->log, conf_path);
 	conf_web_hook_parse(&config->web_hook, conf_path);
 	conf_bridge_parse(config, conf_path);
-	conf_aws_bridge_parse(config, conf_path);
-
-#if defined(SUPP_RULE_ENGINE)
-	conf_rule_parse(&config->rule_eng, conf_path);
-#endif
 
 	conf_auth_parse(&config->auths, conf_path);
 	conf_auth_http_parse(&config->auth_http, conf_path);
@@ -723,25 +710,11 @@ conf_sqlite_init(conf_sqlite *sqlite)
 	sqlite->resend_interval     = 5000;
 }
 
-#if defined(SUPP_RULE_ENGINE)
-static void
-conf_rule_init(conf_rule *rule_en)
-{
-	rule_en->option = 0;
-	rule_en->rules  = NULL;
-	memset(rule_en->rdb, 0, sizeof(void *) * 3);
-}
-#endif
-
 void
 conf_init(conf *nanomq_conf)
 {
 	nanomq_conf->url       = NULL;
 	nanomq_conf->conf_file = NULL;
-
-#if defined(SUPP_RULE_ENGINE)
-	conf_rule_init(&nanomq_conf->rule_eng);
-#endif
 
 	nanomq_conf->max_packet_size        = (1024 * 1024);
 	nanomq_conf->client_max_packet_size = (1024 * 1024);
@@ -766,7 +739,7 @@ conf_init(conf *nanomq_conf)
 
 	nanomq_conf->http_server.enable              = false;
 	nanomq_conf->http_server.port                = 8081;
-	nanomq_conf->http_server.parallel            = 32;
+	nanomq_conf->http_server.parallel            = ncpu * 2;
 	nanomq_conf->http_server.username            = NULL;
 	nanomq_conf->http_server.password            = NULL;
 	nanomq_conf->http_server.auth_type           = BASIC;
@@ -786,7 +759,7 @@ conf_init(conf *nanomq_conf)
 	nanomq_conf->web_hook.enable         = false;
 	nanomq_conf->web_hook.url            = NULL;
 	nanomq_conf->web_hook.encode_payload = plain;
-	nanomq_conf->web_hook.pool_size      = 32;
+	nanomq_conf->web_hook.pool_size      = ncpu * 2;
 	nanomq_conf->web_hook.headers        = NULL;
 	nanomq_conf->web_hook.header_count   = 0;
 	nanomq_conf->web_hook.rules          = NULL;
@@ -799,7 +772,7 @@ conf_init(conf *nanomq_conf)
 	conf_auth_http_req_init(&nanomq_conf->auth_http.acl_req);
 	nanomq_conf->auth_http.timeout         = 5;
 	nanomq_conf->auth_http.connect_timeout = 5;
-	nanomq_conf->auth_http.pool_size       = 32;
+	nanomq_conf->auth_http.pool_size       = ncpu * 2;
 	conf_tls_init(&nanomq_conf->auth_http.tls);
 }
 
@@ -841,9 +814,6 @@ print_conf(conf *nanomq_conf)
 	}
 
 	print_bridge_conf(&nanomq_conf->bridge, "");
-#if defined(SUPP_AWS_BRIDGE)
-	print_bridge_conf(&nanomq_conf->aws_bridge, "aws.");
-#endif
 }
 
 static void
@@ -941,610 +911,6 @@ printf_gateway_conf(zmq_gateway_conf *gateway)
 	log_info("mqtt clean start: %d", gateway->clean_start);
 	log_info("mqtt parallel: %d", gateway->parallel);
 }
-
-#if defined(SUPP_RULE_ENGINE)
-static void
-conf_rule_repub_parse(conf_rule *cr, char *path)
-{
-	assert(path);
-	if (path == NULL || !nano_file_exists(path)) {
-		printf("Configure file [%s] not found or "
-		       "unreadable\n",
-		    path);
-		return;
-	}
-
-	char *   line = NULL;
-	size_t   sz   = 0;
-	FILE *   fp;
-	repub_t *repub = NNI_ALLOC_STRUCT(repub);
-
-	if (NULL == (fp = fopen(path, "r"))) {
-		log_debug("File %s open failed\n", path);
-		return;
-	}
-
-	char *value;
-	while (nano_getline(&line, &sz, fp) != -1) {
-		if (0 == strncmp(line, "rule.repub", strlen("rule.repub"))) {
-
-			int num = 0;
-			if (strstr(line, "address")) {
-				if (0 != sscanf(line, "rule.repub.%d", &num)) {
-					char key[32] = { 0 };
-					snprintf(key, 32,
-					    "rule.repub.%d.address", num);
-					if (NULL !=
-					    (value = get_conf_value(
-					         line, sz, key))) {
-						repub->address = value;
-					}
-				}
-			} else if (strstr(line, "topic")) {
-				if (0 != sscanf(line, "rule.repub.%d", &num)) {
-					char key[32] = { 0 };
-					snprintf(key, 32,
-					    "rule.repub.%d.topic", num);
-					if (NULL !=
-					    (value = get_conf_value(
-					         line, sz, key))) {
-						repub->topic = value;
-					}
-				}
-			} else if (strstr(line, "proto_ver")) {
-				if (0 != sscanf(line, "rule.repub.%d", &num)) {
-					char key[32] = { 0 };
-					snprintf(key, 32,
-					    "rule.repub.%d.proto_ver", num);
-					if (NULL !=
-					    (value = get_conf_value(
-					         line, sz, key))) {
-						repub->proto_ver = atoi(value);
-						free(value);
-					}
-				}
-			} else if (strstr(line, "clientid")) {
-				if (0 != sscanf(line, "rule.repub.%d", &num)) {
-					char key[32] = { 0 };
-					snprintf(key, 32,
-					    "rule.repub.%d.clientid", num);
-					if (NULL !=
-					    (value = get_conf_value(
-					         line, sz, key))) {
-						repub->clientid = value;
-					}
-				}
-			} else if (strstr(line, "username")) {
-				if (0 != sscanf(line, "rule.repub.%d", &num)) {
-					char key[32] = { 0 };
-					snprintf(key, 32,
-					    "rule.repub.%d.username", num);
-					if (NULL !=
-					    (value = get_conf_value(
-					         line, sz, key))) {
-						repub->username = value;
-					}
-				}
-			} else if (strstr(line, "password")) {
-				if (0 != sscanf(line, "rule.repub.%d", &num)) {
-					char key[32] = { 0 };
-					snprintf(key, 32,
-					    "rule.repub.%d.password", num);
-					if (NULL !=
-					    (value = get_conf_value(
-					         line, sz, key))) {
-						repub->password = value;
-					}
-				}
-			} else if (strstr(line, "clean_start")) {
-				if (0 != sscanf(line, "rule.repub.%d", &num)) {
-					char key[32] = { 0 };
-					snprintf(key, 32,
-					    "rule.repub.%d.clean_start", num);
-					if (NULL !=
-					    (value = get_conf_value(
-					         line, sz, key))) {
-						if (!strcmp(value, "true")) {
-							repub->clean_start =
-							    true;
-						} else if (!strcmp(value,
-						               "false")) {
-							repub->clean_start =
-							    false;
-						} else {
-							log_error(
-							    "Unsupport clean "
-							    "start option!");
-							exit(EXIT_FAILURE);
-						}
-						free(value);
-					}
-				}
-			} else if (strstr(line, "keepalive")) {
-				if (0 != sscanf(line, "rule.repub.%d", &num)) {
-					char key[32] = { 0 };
-					snprintf(key, 32,
-					    "rule.repub.%d.keepalive", num);
-					if (NULL !=
-					    (value = get_conf_value(
-					         line, sz, key))) {
-						repub->keepalive = atoi(value);
-						free(value);
-					}
-				}
-			}
-
-		} else if (0 ==
-		    strncmp(line, "rule.event.publish",
-		        strlen("rule.event.publish"))) {
-
-			// TODO more accurate way
-			// topic <=======> broker <======> sql
-			int num = 0;
-			int res =
-			    sscanf(line, "rule.event.publish.%d.sql", &num);
-			if (0 == res) {
-				log_error("Do not find repub client");
-				exit(EXIT_FAILURE);
-			}
-
-			if (NULL != (value = strchr(line, '='))) {
-				value++;
-				rule_sql_parse(cr, value);
-				char *p = strrchr(value, '\"');
-				*p      = '\0';
-
-				cr->rules[cvector_size(cr->rules) - 1].repub =
-				    NNI_ALLOC_STRUCT(repub);
-				memcpy(cr->rules[cvector_size(cr->rules) - 1]
-				           .repub,
-				    repub, sizeof(*repub));
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .forword_type = RULE_FORWORD_REPUB;
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .raw_sql = nng_strdup(++value);
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .enabled = true;
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .rule_id = rule_generate_rule_id();
-			}
-		}
-
-		free(line);
-		line = NULL;
-	}
-
-	NNI_FREE_STRUCT(repub);
-
-	if (line) {
-		free(line);
-	}
-
-	fclose(fp);
-}
-
-static void
-conf_rule_mysql_parse(conf_rule *cr, char *path)
-{
-	assert(path);
-	if (path == NULL || !nano_file_exists(path)) {
-		printf("Configure file [%s] not found or "
-		       "unreadable\n",
-		    path);
-		return;
-	}
-
-	char *      line = NULL;
-	size_t      sz   = 0;
-	FILE *      fp;
-	rule_mysql *mysql = NNI_ALLOC_STRUCT(mysql);
-
-	if (NULL == (fp = fopen(path, "r"))) {
-		log_debug("File %s open failed\n", path);
-		return;
-	}
-
-	char *value;
-	while (nano_getline(&line, &sz, fp) != -1) {
-		if (NULL !=
-		    (value = get_conf_value(line, sz, "rule.mysql.name"))) {
-			cr->mysql_db = value;
-			log_debug(value);
-		} else if (0 ==
-		    strncmp(line, "rule.mysql", strlen("rule.mysql"))) {
-			int num = 0;
-
-			if (strstr(line, "table")) {
-				if (0 != sscanf(line, "rule.mysql.%d", &num)) {
-					char key[32] = { 0 };
-					snprintf(key, 32,
-					    "rule.mysql.%d.table", num);
-					if (NULL !=
-					    (value = get_conf_value(
-					         line, sz, key))) {
-						log_debug(value);
-						mysql->table = value;
-					}
-				}
-			} else if (strstr(line, "host")) {
-				if (0 != sscanf(line, "rule.mysql.%d", &num)) {
-					char key[32] = { 0 };
-					snprintf(key, 32, "rule.mysql.%d.host",
-					    num);
-					if (NULL !=
-					    (value = get_conf_value(
-					         line, sz, key))) {
-						log_debug(value);
-						mysql->host = value;
-					}
-				}
-			} else if (strstr(line, "username")) {
-				if (0 != sscanf(line, "rule.mysql.%d", &num)) {
-					char key[32] = { 0 };
-					snprintf(key, 32, "rule.mysql.%d.username",
-					    num);
-					if (NULL !=
-					    (value = get_conf_value(
-					         line, sz, key))) {
-						log_debug(value);
-						mysql->username = value;
-					}
-				}
-			} else if (strstr(line, "password")) {
-				if (0 != sscanf(line, "rule.mysql.%d", &num)) {
-					char key[32] = { 0 };
-					snprintf(key, 32, "rule.mysql.%d.password",
-					    num);
-					if (NULL !=
-					    (value = get_conf_value(
-					         line, sz, key))) {
-						log_debug(value);
-						mysql->password = value;
-					}
-				}
-			}
-		} else if (0 ==
-		    strncmp(line, "rule.event.publish",
-		        strlen("rule.event.publish"))) {
-
-			// TODO more accurate way
-			// topic <=======> broker <======> sql
-			int num = 0;
-			int res =
-			    sscanf(line, "rule.event.publish.%d.sql", &num);
-			if (0 == res) {
-				log_error("Do not find mysql client");
-				exit(EXIT_FAILURE);
-			}
-
-			if (NULL != (value = strchr(line, '='))) {
-				value++;
-				rule_sql_parse(cr, value);
-				char *p = strrchr(value, '\"');
-				*p      = '\0';
-
-				cr->rules[cvector_size(cr->rules) - 1].mysql =
-				    NNI_ALLOC_STRUCT(mysql);
-				memcpy(cr->rules[cvector_size(cr->rules) - 1]
-				           .mysql,
-				    mysql, sizeof(*mysql));
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .forword_type = RULE_FORWORD_MYSOL;
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .raw_sql = nng_strdup(++value);
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .enabled = true;
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .rule_id = rule_generate_rule_id();
-			}
-		}
-
-		free(line);
-		line = NULL;
-	}
-
-	NNI_FREE_STRUCT(mysql);
-
-	if (line) {
-		free(line);
-	}
-
-	fclose(fp);
-}
-
-static bool
-conf_rule_sqlite_parse(conf_rule *cr, char *path)
-{
-	assert(path);
-	if (path == NULL || !nano_file_exists(path)) {
-		log_debug("Configure file [%s] not found or "
-		          "unreadable\n",
-		    path);
-		return;
-	}
-
-	char * line = NULL;
-	size_t sz   = 0;
-	FILE * fp;
-	char * table = NULL;
-
-	if (NULL == (fp = fopen(path, "r"))) {
-		log_error("File %s open failed\n", path);
-		return;
-	}
-
-	char *value;
-	while (nano_getline(&line, &sz, fp) != -1) {
-		if (NULL !=
-		    (value = get_conf_value(line, sz, "rule.sqlite.path"))) {
-			cr->sqlite_db = value;
-		} else if (NULL != strstr(line, "rule.sqlite")) {
-
-			int num = 0;
-			int res = sscanf(line, "rule.sqlite.%d.table", &num);
-			if (0 == res) {
-				log_fatal("Do not find table num");
-				exit(EXIT_FAILURE);
-			}
-
-			char key[32] = { 0 };
-			snprintf(key, 32, "rule.sqlite.%d.table", num);
-
-			if (NULL != (value = get_conf_value(line, sz, key))) {
-				table = value;
-			}
-
-		} else if (NULL != strstr(line, "rule.event.publish")) {
-
-			// TODO more accurate way table <======> sql
-			int num = 0;
-			int res =
-			    sscanf(line, "rule.event.publish.%d.sql", &num);
-			if (0 == res) {
-				log_fatal("Do not find table num");
-				exit(EXIT_FAILURE);
-			}
-
-			if (NULL != (value = strchr(line, '='))) {
-				value++;
-				rule_sql_parse(cr, value);
-				char *p = strrchr(value, '\"');
-				*p      = '\0';
-
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .sqlite_table = table;
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .forword_type = RULE_FORWORD_SQLITE;
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .raw_sql = nng_strdup(++value);
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .enabled = true;
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .rule_id = rule_generate_rule_id();
-			}
-		}
-
-		free(line);
-		line = NULL;
-	}
-
-	if (line) {
-		free(line);
-	}
-
-	fclose(fp);
-}
-
-static void
-conf_rule_fdb_parse(conf_rule *cr, char *path)
-{
-	if (path == NULL || !nano_file_exists(path)) {
-		log_error("Configure file [%s] not found or "
-		          "unreadable\n",
-		    path);
-		return;
-	}
-
-	char *    line = NULL;
-	int       rc   = 0;
-	size_t    sz   = 0;
-	FILE *    fp;
-	rule_key *rk = (rule_key *) nni_zalloc(sizeof(rule_key));
-	memset(rk, 0, sizeof(rule_key));
-
-	if (NULL == (fp = fopen(path, "r"))) {
-		log_error("File %s open failed\n", path);
-		return;
-	}
-
-	char *value;
-	while (nano_getline(&line, &sz, fp) != -1) {
-		if ((value = get_conf_value(line, sz, "rule.fdb.path")) !=
-		    NULL) {
-			cr->sqlite_db = value;
-		} else if ((value = get_conf_value(
-		                line, sz, "rule.event.publish.key")) != NULL) {
-			if (-1 == (rc = rule_find_key(value, strlen(value)))) {
-				if (strstr(value, "payload.")) {
-					char *p = strchr(value, '.');
-					rk->key_arr = NULL;
-					rule_get_key_arr(p, rk);
-					rk->flag[8] = true;
-				}
-			} else {
-				rk->flag[rc] = true;
-			}
-			free(value);
-		} else if ((value = get_conf_value(line, sz,
-		                "rule.event.publish.key.autoincrement")) !=
-		    NULL) {
-			if (0 == nni_strcasecmp(value, "true")) {
-				rk->auto_inc = true;
-			} else if (0 == nni_strcasecmp(value, "false")) {
-				rk->auto_inc = false;
-			} else {
-				log_warn("Unsupport autoincrement option.");
-			}
-			free(value);
-
-		} else if (NULL != strstr(line, "rule.event.publish.sql")) {
-			if (NULL != (value = strchr(line, '='))) {
-				value++;
-				rule_sql_parse(cr, value);
-				char *p = strrchr(value, '\"');
-				*p      = '\0';
-				cr->rules[cvector_size(cr->rules) - 1].key =
-				    rk;
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .forword_type = RULE_FORWORD_FDB;
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .raw_sql = nng_strdup(++value);
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .enabled = true;
-				cr->rules[cvector_size(cr->rules) - 1]
-				    .rule_id = rule_generate_rule_id();
-			}
-		}
-
-		free(line);
-		line = NULL;
-	}
-
-	if (line) {
-		free(line);
-	}
-
-	fclose(fp);
-}
-
-static void
-conf_rule_parse(conf_rule *rule, const char *path)
-{
-	char * line = NULL;
-	size_t sz   = 0;
-	FILE * fp;
-
-	if ((fp = fopen(path, "r")) == NULL) {
-		log_error("File %s open failed\n", path);
-		return;
-	}
-
-	char *value;
-	while (nano_getline(&line, &sz, fp) != -1) {
-		if ((value = get_conf_value(line, sz, "rule_option")) !=
-		    NULL) {
-			if (0 != nni_strcasecmp(value, "ON")) {
-				if (0 != nni_strcasecmp(value, "OFF")) {
-					log_warn(
-					    "Unsupported option: %s\nrule "
-					    "option only support ON/OFF",
-					    value);
-				}
-				free(value);
-				break;
-			}
-			free(value);
-			// sqlite
-		} else if ((value = get_conf_value(
-		                line, sz, "rule_option.sqlite")) != NULL) {
-			if (0 == nni_strcasecmp(value, "enable")) {
-				rule->option |= RULE_ENG_SDB;
-			} else {
-				if (0 != nni_strcasecmp(value, "disable")) {
-					log_warn(
-					    "Unsupported option: %s\nrule "
-					    "option sqlite only support "
-					    "enable/disable",
-					    value);
-					break;
-				}
-			}
-			free(value);
-		} else if ((value = get_conf_value(line, sz,
-		                "rule_option.sqlite.conf.path")) != NULL) {
-			if (RULE_ENG_SDB & rule->option) {
-				conf_rule_sqlite_parse(&cr, value);
-			}
-			free(value);
-			// repub
-		} else if ((value = get_conf_value(
-		                line, sz, "rule_option.repub")) != NULL) {
-			if (0 == nni_strcasecmp(value, "enable")) {
-				rule->option |= RULE_ENG_RPB;
-			} else {
-				if (0 != nni_strcasecmp(value, "disable")) {
-					log_error(
-					    "Unsupported option: %s\nrule "
-					    "option sqlite only support "
-					    "enable/disable",
-					    value);
-					break;
-				}
-			}
-			free(value);
-		} else if ((value = get_conf_value(line, sz,
-		                "rule_option.repub.conf.path")) != NULL) {
-			if (RULE_ENG_RPB & rule->option) {
-				conf_rule_repub_parse(&cr, value);
-			}
-			free(value);
-			// mysql
-		} else if ((value = get_conf_value(
-		                line, sz, "rule_option.mysql")) != NULL) {
-			if (0 == nni_strcasecmp(value, "enable")) {
-				rule->option |= RULE_ENG_MDB;
-			} else {
-				if (0 != nni_strcasecmp(value, "disable")) {
-					log_warn(
-					    "Unsupported option: %s\nrule "
-					    "option mysql only support "
-					    "enable/disable",
-					    value);
-					break;
-				}
-			}
-			free(value);
-		} else if ((value = get_conf_value(line, sz,
-		                "rule_option.mysql.conf.path")) != NULL) {
-			if (RULE_ENG_MDB & rule->option) {
-				conf_rule_mysql_parse(&cr, value);
-			}
-			free(value);
-			// fdb
-		} else if ((value = get_conf_value(
-		                line, sz, "rule_option.fdb")) != NULL) {
-			if (0 == nni_strcasecmp(value, "enable")) {
-				rule->option |= RULE_ENG_FDB;
-			} else {
-				if (0 != nni_strcasecmp(value, "disable")) {
-					log_warn(
-					    "Unsupported option: %s\nrule "
-					    "option fdb only support "
-					    "enable/disable",
-					    value);
-					break;
-				}
-			}
-			free(value);
-		} else if ((value = get_conf_value(line, sz,
-		                "rule_option.fdb.conf.path")) != NULL) {
-			if (RULE_ENG_FDB & rule->option) {
-				conf_rule_fdb_parse(rule, value);
-			}
-			free(value);
-		}
-
-		free(line);
-		line = NULL;
-	}
-
-	if (line) {
-		free(line);
-	}
-
-	fclose(fp);
-}
-#endif
 
 void
 conf_gateway_parse(zmq_gateway_conf *gateway)
@@ -2025,6 +1391,8 @@ print_bridge_conf(conf_bridge *bridge, const char *prefix)
 	}
 	for (size_t i = 0; i < bridge->count; i++) {
 		conf_bridge_node *node = bridge->nodes[i];
+        log_info("%sbridge.mqtt.%s.bridge_mode:  %s", prefix, node->name,
+                node->enable ? "true" : "false");
 		log_info("%sbridge.mqtt.%s.address:      %s", prefix,
 		    node->name, node->address);
 		log_info("%sbridge.mqtt.%s.proto_ver:    %d", prefix,
@@ -2632,23 +2000,12 @@ conf_sqlite_destroy(conf_sqlite *sqlite)
 	}
 }
 
-#if defined(SUPP_RULE_ENGINE)
-static void
-conf_rule_destroy(conf_rule *re)
-{
-	if (re) { }
-}
-#endif
-
 void
 conf_fini(conf *nanomq_conf)
 {
 	nng_strfree(nanomq_conf->url);
 	nng_strfree(nanomq_conf->conf_file);
 
-#if defined(SUPP_RULE_ENGINE)
-	conf_rule_destroy(&nanomq_conf->rule_eng);
-#endif
 	conf_sqlite_destroy(&nanomq_conf->sqlite);
 	conf_tls_destroy(&nanomq_conf->tls);
 
