@@ -1391,6 +1391,8 @@ print_bridge_conf(conf_bridge *bridge, const char *prefix)
 	}
 	for (size_t i = 0; i < bridge->count; i++) {
 		conf_bridge_node *node = bridge->nodes[i];
+        log_info("%sbridge.mqtt.%s.bridge_mode:  %s", prefix, node->name,
+                node->enable ? "true" : "false");
 		log_info("%sbridge.mqtt.%s.address:      %s", prefix,
 		    node->name, node->address);
 		log_info("%sbridge.mqtt.%s.proto_ver:    %d", prefix,

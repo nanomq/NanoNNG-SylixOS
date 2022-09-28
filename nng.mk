@@ -139,7 +139,6 @@ src/nng/src/supplemental/nanolib/file.c \
 src/nng/src/supplemental/nanolib/hash_table.c \
 src/nng/src/supplemental/nanolib/log.c \
 src/nng/src/supplemental/nanolib/mqtt_db.c \
-src/nng/src/supplemental/nanolib/rule.c \
 src/nng/src/supplemental/sha1/sha1.c \
 src/nng/src/supplemental/tls/mbedtls/tls.c \
 src/nng/src/supplemental/tls/tls_common.c \
