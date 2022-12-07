@@ -113,8 +113,10 @@ src/nng/src/sp/protocol.c \
 src/nng/src/sp/transport/inproc/inproc.c \
 src/nng/src/sp/transport/ipc/ipc.c \
 src/nng/src/sp/transport/mqtt/broker_tcp.c \
+src/nng/src/sp/transport/mqtts/broker_tls.c \
 src/nng/src/sp/transport/mqttws/nmq_websocket.c \
 src/nng/src/sp/transport/tcp/tcp.c \
+src/nng/src/sp/transport/tls/tls.c \
 src/nng/src/sp/transport/ws/websocket.c \
 src/nng/src/sp/transport.c \
 src/nng/src/supplemental/base64/base64.c \
@@ -157,12 +159,13 @@ LOCAL_INC_PATH :=  \
 #*********************************************************************************************************
 # Pre-defined macro (eg. -DYOUR_MARCO=1)
 #*********************************************************************************************************
-LOCAL_DSYMBOL := 
+LOCAL_DSYMBOL :=  \
+-DNNG_TLS_ENGINE=mbed
 
 #*********************************************************************************************************
 # Compiler flags
 #*********************************************************************************************************
-LOCAL_CFLAGS := 
+LOCAL_CFLAGS := -DDEBUG
 LOCAL_CXXFLAGS := 
 LOCAL_LINKFLAGS := 
 
