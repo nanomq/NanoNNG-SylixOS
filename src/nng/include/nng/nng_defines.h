@@ -28,15 +28,25 @@
 
 #define NNG_SUPP_HTTP
 #define NNG_SUPP_SQLITE
+#define NNG_SUPP_TLS
+
+#if defined(NNG_TLS_ENGINE)
+
+#define NNG_TLS_ENGINE_INIT nng_tls_engine_init_mbed
+#define NNG_TLS_ENGINE_FINI nng_tls_engine_fini_mbed
+
+#endif
 
 #define NNG_TRANSPORT_INPROC 1
 #define NNG_TRANSPORT_IPC 1
 #define NNG_TRANSPORT_TCP 1
+#define NNG_TRANSPORT_TLS 1
 #define NNG_TRANSPORT_MQTT_TCP 1
 #define NNG_TRANSPORT_WS 1
 #define NNG_SUPP_WEBSOCKET 1
 #define NNG_TRANSPORT_MQTT_TCP 1
 #define NNG_TRANSPORT_MQTT_BROKER_TCP 1
+#define NNG_TRANSPORT_MQTT_BROKER_TLS 1
 #define NNG_TRANSPORT_MQTT_BROKER_WS 1
 
 #endif /* SRC_NNG_INCLUDE_NNG_NNG_DEFINES_H_ */

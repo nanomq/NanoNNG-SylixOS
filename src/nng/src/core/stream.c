@@ -15,6 +15,7 @@
 #include "nng_impl.h"
 
 #include "tcp.h"
+#include "../supplemental/tls/tls_api.h"
 #include "../supplemental/websocket/websocket.h"
 
 static struct {
@@ -102,6 +103,36 @@ static struct {
 	    .dialer_alloc   = nni_tcp_dialer_alloc,
 	    .listener_alloc = nni_tcp_listener_alloc,
 	},
+	{
+        .scheme         = "tls+tcp",
+        .dialer_alloc   = nni_tls_dialer_alloc,
+        .listener_alloc = nni_tls_listener_alloc,
+    },
+    {
+        .scheme         = "tls+tcp4",
+        .dialer_alloc   = nni_tls_dialer_alloc,
+        .listener_alloc = nni_tls_listener_alloc,
+    },
+    {
+        .scheme         = "tls+tcp6",
+        .dialer_alloc   = nni_tls_dialer_alloc,
+        .listener_alloc = nni_tls_listener_alloc,
+    },
+    {
+        .scheme         = "tls+nmq-tcp",
+        .dialer_alloc   = nni_tls_dialer_alloc,
+        .listener_alloc = nni_tls_listener_alloc,
+    },
+    {
+        .scheme         = "tls+nmq-tcp4",
+        .dialer_alloc   = nni_tls_dialer_alloc,
+        .listener_alloc = nni_tls_listener_alloc,
+    },
+    {
+        .scheme         = "tls+nmq-tcp6",
+        .dialer_alloc   = nni_tls_dialer_alloc,
+        .listener_alloc = nni_tls_listener_alloc,
+    },
 	{
 	    .scheme         = "ws",
 	    .dialer_alloc   = nni_ws_dialer_alloc,

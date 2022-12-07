@@ -10,6 +10,6 @@
     <UploadPath>
         <PairItem key="$(WORKSPACE_nng)/$(Output)/libnng.so" value="/lib/libnng.so"/>
     </UploadPath>
-    <DeviceSetting DevName="192.168.7.31" WorkDir="/apps/nng"/>
+    <DeviceSetting DevName="172.168.0.47" WorkDir="/apps/nng"/>
     <ExtDevNames/>
 </SylixOSSetting>
