@@ -7,9 +7,7 @@
         <OutputPath Name="Release" Path="Release" TreeNode="Release"/>
     </OutputSetting>
     <BuildSetting CoustomCfgMakefile="false" NeedReBuild="false" NotScanSourceFile="false"/>
-    <UploadPath>
-        <PairItem key="$(WORKSPACE_nng)/$(Output)/libnng.so" value="/lib/libnng.so"/>
-    </UploadPath>
-    <DeviceSetting DevName="172.168.0.47" WorkDir="/apps/nng"/>
+    <UploadPath/>
+    <DeviceSetting DevName="192.168.7.37" WorkDir="/apps/nng"/>
     <ExtDevNames/>
 </SylixOSSetting>
