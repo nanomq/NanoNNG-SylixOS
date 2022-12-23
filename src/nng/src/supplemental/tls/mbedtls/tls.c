@@ -255,7 +255,7 @@ static int
 conn_handshake(nng_tls_engine_conn *ec)
 {
 	int rv;
-
+	mbedtls_mutex_init( &mbedtls_threading_gmtime_mutex );
 	rv = mbedtls_ssl_handshake(&ec->ctx);
 	switch (rv) {
 	case MBEDTLS_ERR_SSL_WANT_WRITE:
