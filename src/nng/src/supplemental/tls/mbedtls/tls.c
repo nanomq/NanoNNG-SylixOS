@@ -190,7 +190,7 @@ conn_init(nng_tls_engine_conn *ec, void *tls, nng_tls_engine_config *cfg)
 	int rv;
 
 	ec->tls = tls;
-
+    mbedtls_mutex_init( &mbedtls_threading_gmtime_mutex );
 	mbedtls_ssl_init(&ec->ctx);
 	mbedtls_ssl_set_bio(&ec->ctx, tls, net_send, net_recv, NULL);
 
@@ -255,7 +255,7 @@ static int
 conn_handshake(nng_tls_engine_conn *ec)
 {
 	int rv;
-	mbedtls_mutex_init( &mbedtls_threading_gmtime_mutex );
+	
 	rv = mbedtls_ssl_handshake(&ec->ctx);
 	switch (rv) {
 	case MBEDTLS_ERR_SSL_WANT_WRITE:
