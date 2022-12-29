@@ -11,6 +11,8 @@
 #include "../../core/nng_impl.h"
 #include "posix_pollq.h"
 
+#if !defined(NNG_HAVE_EPOLL) || !defined(NNG_HAVE_EVENTFD)
+
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -346,3 +348,5 @@ nni_posix_pollq_sysfini(void)
 {
 	nni_posix_pollq_destroy(&nni_posix_global_pollq);
 }
+
+#endif

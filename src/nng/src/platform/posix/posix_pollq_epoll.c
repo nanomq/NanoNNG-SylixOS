@@ -9,7 +9,7 @@
 // found online at https://opensource.org/licenses/MIT.
 //
 
-#ifdef NNG_HAVE_EPOLL
+#if defined(NNG_HAVE_EPOLL) && defined(NNG_HAVE_EVENTFD)
 
 #include <errno.h>
 #include <fcntl.h>
@@ -21,7 +21,7 @@
 #include <unistd.h>
 
 #include "../../core/nng_impl.h"
-#include "platform/posix/posix_pollq.h"
+#include "posix_pollq.h"
 
 typedef struct nni_posix_pollq nni_posix_pollq;
 

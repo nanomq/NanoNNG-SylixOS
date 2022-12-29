@@ -16,20 +16,24 @@
 	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 	<storageModule moduleId="refreshScope"/>
 	<storageModule moduleId="org.eclipse.cdt.core.pathentry">
-		<pathentry kind="src" path=""/>
-		<pathentry include="D:/Projects/NanoMQ-SylixOS-WS-test/NanoMQ-SylixOS/nng/src/nng/include" kind="inc" path="" system="true"/>
-		<pathentry include="D:/Projects/NanoMQ-SylixOS-WS-test/NanoMQ-SylixOS/SylixOS-Base/libsqlite3/sqlite3" kind="inc" path="" system="true"/>
-		<pathentry include="D:/Projects/NanoMQ-SylixOS-WS-test/NanoMQ-SylixOS/SylixOS-Base/libsylixos/SylixOS" kind="inc" path="" system="true"/>
-		<pathentry include="D:/Projects/NanoMQ-SylixOS-WS-test/NanoMQ-SylixOS/SylixOS-Base/libsylixos/SylixOS/include" kind="inc" path="" system="true"/>
-		<pathentry include="D:/Projects/NanoMQ-SylixOS-WS-test/NanoMQ-SylixOS/SylixOS-Base/libcextern/libcextern/include" kind="inc" path="" system="true"/>
-		<pathentry include="D:/ACOINFO/RealEvo/compiler/aarch64-sylixos-toolchain/lib/gcc/aarch64-sylixos-elf/10.2.1/include" kind="inc" path="" system="true"/>
-		<pathentry include="D:/ACOINFO/RealEvo/compiler/aarch64-sylixos-toolchain/aarch64-sylixos-elf/include" kind="inc" path="" system="true"/>
-		<pathentry include="D:/Projects/NanoMQ-SylixOS-WS-test/NanoMQ-SylixOS/SylixOS-Base/libsylixos/SylixOS/include/network" kind="inc" path="" system="true"/>
-		<pathentry kind="mac" name="NNG_TLS_ENGINE" path="" value="mbed"/>
-		<pathentry kind="mac" name="SYLIXOS" path="" value=""/>
 		<pathentry kind="mac" name="__GNUC__" path="" value="1"/>
+		<pathentry kind="mac" name="SYLIXOS" path="" value=""/>
 		<pathentry kind="mac" name="__aarch64__" path="" value=""/>
-		<pathentry excluding="dep|obj" kind="out" path="Debug"/>
-		<pathentry excluding="dep|obj" kind="out" path="Release"/>
+		<pathentry kind="mac" name="NNG_TLS_ENGINE" path="" value="mbed"/>
+		<pathentry kind="mac" name="NNG_HAVE_STDATOMIC" path="" value="1"/>
+		<pathentry kind="mac" name="NNG_HAVE_EVENTFD" path="" value="1"/>
+		<pathentry kind="mac" name="NNG_HAVE_GETRANDOM" path="" value="1"/>
+		<pathentry kind="mac" name="NNG_HAVE_PTHREAD_SETNAME_NP" path="" value="1"/>
+		<pathentry kind="mac" name="NNG_SETSTACKSIZE" path="" value="1"/>
+		<pathentry base-ref="nng" include="src/nng/include" kind="inc" path="" system="true"/>
+		<pathentry base-ref="nng" include="D:/Projects/NanoMQ-SylixOS-WS-test/NanoMQ-SylixOS/SylixOS-Base/libsqlite3/sqlite3" kind="inc" path="" system="true"/>
+		<pathentry base-ref="nng" include="D:/Projects/NanoMQ-SylixOS-WS-test/NanoMQ-SylixOS/SylixOS-Base/libsylixos/SylixOS" kind="inc" path="" system="true"/>
+		<pathentry base-ref="nng" include="D:/Projects/NanoMQ-SylixOS-WS-test/NanoMQ-SylixOS/SylixOS-Base/libsylixos/SylixOS/include" kind="inc" path="" system="true"/>
+		<pathentry base-ref="nng" include="D:/Projects/NanoMQ-SylixOS-WS-test/NanoMQ-SylixOS/SylixOS-Base/libcextern/libcextern/include" kind="inc" path="" system="true"/>
+		<pathentry base-ref="nng" include="D:/ACOINFO/RealEvo/compiler/aarch64-sylixos-toolchain/lib/gcc/aarch64-sylixos-elf/10.2.1/include" kind="inc" path="" system="true"/>
+		<pathentry base-ref="nng" include="D:/ACOINFO/RealEvo/compiler/aarch64-sylixos-toolchain/aarch64-sylixos-elf/include" kind="inc" path="" system="true"/>
+		<pathentry base-ref="nng" include="D:/Projects/NanoMQ-SylixOS-WS-test/NanoMQ-SylixOS/SylixOS-Base/libsylixos/SylixOS/include/network" kind="inc" path="" system="true"/>
+		<pathentry excluding="obj|dep" kind="out" path="Debug"/>
+		<pathentry excluding="obj|dep" kind="out" path="Release"/>
 	</storageModule>
 </cproject>
