@@ -516,6 +516,8 @@ nmq_tcptran_pipe_send_cb(void *arg)
 			nmq_pipe_send_start_v4(p, msg, txaio);
 		else if (p->tcp_cparam->pro_ver == 5)
 			nmq_pipe_send_start_v5(p, msg, txaio);
+		else if (p->tcp_cparam->pro_ver == 3)
+		    nmq_pipe_send_start_v4(p, msg, txaio);
 		nni_mtx_unlock(&p->mtx);
 		return;
 	}
@@ -1369,7 +1371,9 @@ tcptran_pipe_send_start(tcptran_pipe *p)
 		nmq_pipe_send_start_v4(p, msg, aio);
 	} else if (p->tcp_cparam->pro_ver == 5) {
 		nmq_pipe_send_start_v5(p, msg, aio);
-	}
+	} else if (p->tcp_cparam->pro_ver == 3) {
+        nmq_pipe_send_start_v4(p, msg, aio);
+    }
 	return;
 }
 
