@@ -44,7 +44,7 @@ static int  mqtt_pipe_init(void *arg, nni_pipe *pipe, void *s);
 static void mqtt_pipe_fini(void *arg);
 static int  mqtt_pipe_start(void *arg);
 static void mqtt_pipe_stop(void *arg);
-static void mqtt_pipe_close(void *arg);
+static int mqtt_pipe_close(void *arg);
 
 static void mqtt_ctx_init(void *arg, void *sock);
 static void mqtt_ctx_fini(void *arg);
@@ -493,7 +493,7 @@ mqtt_pipe_stop(void *arg)
 	nni_aio_stop(&p->time_aio);
 }
 
-static void
+static int
 mqtt_pipe_close(void *arg)
 {
 	mqtt_pipe_t *p = arg;
@@ -523,7 +523,7 @@ mqtt_pipe_close(void *arg)
 #ifdef NNG_HAVE_MQTT_BROKER
 	if (s->cparam == NULL) {
 		nni_mtx_unlock(&s->mtx);
-		return;
+		return 0;
 	}
 	// Return disconnect event to broker
 	uint16_t count = 0;
@@ -558,9 +558,9 @@ mqtt_timer_cb(void *arg)
 {
 	mqtt_pipe_t *p = arg;
 	mqtt_sock_t *s = p->mqtt_sock;
-	nni_msg *  msg;
-	nni_aio *  aio;
-	uint16_t   pid = 0;
+//	nni_msg *  msg;
+//	nni_aio *  aio;
+//	uint16_t   pid = 0;
 
 	if (nng_aio_result(&p->time_aio) != 0) {
 		return;
@@ -571,36 +571,36 @@ mqtt_timer_cb(void *arg)
 		return;
 	}
 	// start message resending
-	msg = nni_id_get_any(&p->sent_unack, &pid);
-	if (msg != NULL) {
-		uint16_t ptype;
-		ptype = nni_mqtt_msg_get_packet_type(msg);
-		if (ptype == NNG_MQTT_PUBLISH) {
-			nni_mqtt_msg_set_publish_dup(msg, true);
-		}
-		if (!p->busy) {
-			p->busy = true;
-			nni_msg_clone(msg);
-			nni_mqttv5_msg_encode(msg);
-			aio = nni_mqtt_msg_get_aio(msg);
-			if (aio) {
-				nni_aio_bump_count(aio,
-				    nni_msg_header_len(msg) +
-				        nni_msg_len(msg));
-				nni_aio_set_msg(aio, NULL);
-			}
-			nni_aio_set_msg(&p->send_aio, msg);
-			nni_pipe_send(p->pipe, &p->send_aio);
-
-			nni_mtx_unlock(&s->mtx);
-			nni_sleep_aio(s->retry, &p->time_aio);
-			return;
-		} else {
-			nni_msg_clone(msg);
-			nni_lmq_put(&p->send_messages, msg);
-		}
-	}
-
+//	msg = nni_id_get_any(&p->sent_unack, &pid);
+//	if (msg != NULL) {
+//		uint16_t ptype;
+//		ptype = nni_mqtt_msg_get_packet_type(msg);
+//		if (ptype == NNG_MQTT_PUBLISH) {
+//			nni_mqtt_msg_set_publish_dup(msg, true);
+//		}
+//		if (!p->busy) {
+//			p->busy = true;
+//			nni_msg_clone(msg);
+//			nni_mqttv5_msg_encode(msg);
+//			aio = nni_mqtt_msg_get_aio(msg);
+//			if (aio) {
+//				nni_aio_bump_count(aio,
+//				    nni_msg_header_len(msg) +
+//				        nni_msg_len(msg));
+//				nni_aio_set_msg(aio, NULL);
+//			}
+//			nni_aio_set_msg(&p->send_aio, msg);
+//			nni_pipe_send(p->pipe, &p->send_aio);
+//
+//			nni_mtx_unlock(&s->mtx);
+//			nni_sleep_aio(s->retry, &p->time_aio);
+//			return;
+//		} else {
+//			nni_msg_clone(msg);
+//			nni_lmq_put(&p->send_messages, msg);
+//		}
+//	}
+//
 	nni_mtx_unlock(&s->mtx);
 	nni_sleep_aio(s->retry, &p->time_aio);
 	return;
