@@ -31,7 +31,7 @@ typedef struct cs_msg_list cs_msg_list;
 static void        nano_pipe_send_cb(void *);
 static void        nano_pipe_recv_cb(void *);
 static void        nano_pipe_fini(void *);
-static void        nano_pipe_close(void *);
+static int        nano_pipe_close(void *);
 static inline void close_pipe(nano_pipe *p);
 // static void nano_period_check(nano_sock *s, nni_list *sent_list, void *arg);
 // static void nano_keepalive(nano_pipe *p, void *arg);
@@ -751,7 +751,7 @@ close_pipe(nano_pipe *p)
 	nni_id_remove(&s->pipes, nni_pipe_id(p->pipe));
 }
 
-static void
+static int
 nano_pipe_close(void *arg)
 {
 	nano_pipe *p = arg;
@@ -767,7 +767,7 @@ nano_pipe_close(void *arg)
 	if (npipe->cache == true) {
 		// not first time we trying to close stored session pipe
 		nni_atomic_swap_bool(&npipe->p_closed, false);
-		return;
+		return -1;
 	}
 	nni_mtx_lock(&s->lk);
 	// we freed the conn_param when restoring pipe
@@ -791,7 +791,7 @@ nano_pipe_close(void *arg)
 		nano_nni_lmq_flush(&p->rlmq);
 		nni_mtx_unlock(&s->lk);
 		nni_mtx_unlock(&p->lk);
-		return;
+		return -1;
 	}
 	close_pipe(p);
 
@@ -803,7 +803,7 @@ nano_pipe_close(void *arg)
 		    nano_msg_notify_disconnect(p->conn_param, p->reason_code);
 		if (msg == NULL) {
 			nni_mtx_unlock(&s->lk);
-			return;
+			return 0;
 		}
 		nni_msg_set_conn_param(msg, p->conn_param);
 		// clone for notification pub
@@ -819,7 +819,7 @@ nano_pipe_close(void *arg)
 			nni_mtx_unlock(&s->lk);
 			nni_aio_set_msg(aio, msg);
 			nni_aio_finish(aio, 0, nni_msg_len(msg));
-			return;
+			return 0;
 		} else {
 			// no enough ctx, so cache to waitlmq
 			if (nni_lmq_full(&s->waitlmq)) {
@@ -832,6 +832,7 @@ nano_pipe_close(void *arg)
 		}
 	}
 	nni_mtx_unlock(&s->lk);
+	return 0;
 }
 
 static void
