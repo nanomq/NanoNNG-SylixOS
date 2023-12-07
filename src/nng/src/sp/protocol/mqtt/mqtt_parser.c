@@ -585,10 +585,8 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 	cparam->pro_name.body =
 	    (char *) copyn_utf8_str(packet, &pos, &len_of_str, max - pos);
 	cparam->pro_name.len = len_of_str;
-	rv                   = len_of_str < 0 ? PROTOCOL_ERROR : 0;
-	if(strncmp(cparam->pro_name.body, "MQTT", 4) != 0) {
-	    rv = PROTOCOL_ERROR;
-	}
+	// At least 4 bytes left in valid CONNECT
+	rv = (len_of_str < 0 || pos + 4 > max) ? PROTOCOL_ERROR : 0;
 	log_trace("pro_name: %s", cparam->pro_name.body);
 	// protocol ver
 	cparam->pro_ver = packet[pos];
@@ -600,6 +598,10 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 	cparam->will_qos    = (cparam->con_flag & 0x18) >> 3;
 	cparam->will_retain = (cparam->con_flag & 0x20) >> 5;
 	log_trace("conn flag:%x", cparam->con_flag);
+    if ((cparam->will_flag == 1 && cparam->will_qos > 2)
+            || strncmp(cparam->pro_name.body, "MQTT", 4) != 0
+            || cparam->pro_ver > 5 || cparam->pro_ver < 3)
+        return PROTOCOL_ERROR;
 	pos++;
 	// keepalive
 	NNI_GET16(packet + pos, tmp);
