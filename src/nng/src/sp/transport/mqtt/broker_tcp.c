@@ -603,6 +603,7 @@ tcptran_pipe_recv_cb(void *arg)
 		// length error
 		if (p->gotrxhead == NNI_NANO_MAX_HEADER_SIZE) {
 			rv = NNG_EMSGSIZE;
+			log_warn("MALFORMED_PACKET received.");
 			goto recv_error;
 		}
 		// same packet, continue receving next byte of remaining length
@@ -675,7 +676,8 @@ tcptran_pipe_recv_cb(void *arg)
 	type     = p->rxlen[0] & 0xf0;
     if (len <= 0 && (type == CMD_SUBSCRIBE || type == CMD_PUBLISH ||
     CMD_UNSUBSCRIBE)) {
-        rv = PROTOCOL_ERROR;
+        log_warn("Invaild Packet Type: Connection closed.");
+        rv = MALFORMED_PACKET;
         goto recv_error;
     }
     p->rxmsg = NULL;
@@ -719,24 +721,25 @@ tcptran_pipe_recv_cb(void *arg)
 			ack       = true;
 		}
 	} else if (type == CMD_PUBREC) {
-		if (nni_mqtt_pubres_decode(msg, &packet_id, &reason_code, &prop,
-		        cparam->pro_ver) != 0) {
+		if ((rv = nni_mqtt_pubres_decode(msg, &packet_id, &reason_code, &prop,
+		        cparam->pro_ver)) != 0) {
 			log_error("decode PUBREC variable header failed!");
 		}
 		ack_cmd = CMD_PUBREL;
 		ack     = true;
 	} else if (type == CMD_PUBREL) {
-		if (nni_mqtt_pubres_decode(msg, &packet_id, &reason_code, &prop,
-		        cparam->pro_ver) != 0) {
+		if ((rv = nni_mqtt_pubres_decode(msg, &packet_id, &reason_code, &prop,
+		        cparam->pro_ver)) != 0) {
 			log_error("decode PUBREL variable header failed!");
 		}
 		ack_cmd = CMD_PUBCOMP;
 		ack     = true;
 	} else if (type == CMD_PUBACK || type == CMD_PUBCOMP) {
-		if (nni_mqtt_pubres_decode(msg, &packet_id, &reason_code, &prop,
-		        cparam->pro_ver) != 0) {
+		if ((rv = nni_mqtt_pubres_decode(msg, &packet_id, &reason_code, &prop,
+		        cparam->pro_ver)) != 0) {
 			log_error("decode PUBACK or PUBCOMP variable header "
 			          "failed!");
+			goto recv_error;
 		}
 		// MQTT V5 flow control
 		if (p->tcp_cparam->pro_ver == 5) {
@@ -813,13 +816,14 @@ tcptran_pipe_recv_cb(void *arg)
 
 recv_error:
 	nni_aio_list_remove(aio);
-	msg      = p->rxmsg;
+	nni_msg_free(msg);
+	nni_msg_free(p->rxmsg);
+	msg = NULL;
 	p->rxmsg = NULL;
 	nni_pipe_bump_error(p->npipe, rv);
 	nni_mtx_unlock(&p->mtx);
-	nni_msg_free(msg);
 	nni_aio_finish_error(aio, rv);
-	log_warn("tcptran_pipe_recv_cb: recv error rv: %d\n", rv);
+	log_warn("tcptran_pipe_recv_cb: parse error rv: %d\n", rv);
 	return;
 notify:
 	// nni_pipe_bump_rx(p->npipe, n);
