@@ -598,10 +598,10 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 	cparam->will_qos    = (cparam->con_flag & 0x18) >> 3;
 	cparam->will_retain = (cparam->con_flag & 0x20) >> 5;
 	log_trace("conn flag:%x", cparam->con_flag);
-    if ((cparam->will_flag == 1 && cparam->will_qos > 2)
-            || strncmp(cparam->pro_name.body, "MQTT", 4) != 0
-            || cparam->pro_ver > 5 || cparam->pro_ver < 3)
-        return PROTOCOL_ERROR;
+	if ((cparam->will_flag == 1 && cparam->will_qos > 2)
+	        || strncmp(cparam->pro_name.body, "MQTT", 4) != 0
+	        || cparam->pro_ver > 5 || cparam->pro_ver < 3)
+	    return PROTOCOL_ERROR;
 	pos++;
 	// keepalive
 	NNI_GET16(packet + pos, tmp);

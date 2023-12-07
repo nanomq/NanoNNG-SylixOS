@@ -306,10 +306,10 @@ nng_mqtt_msg_set_publish_topic(nng_msg *msg, const char *topic)
         return 0;
     }
     // wild card
-	if (strchr(topic, '#') != NULL || strchr(topic, '+') != NULL) {
-		return -1;
-	}
-	return nni_mqtt_msg_set_publish_topic(msg, topic);
+    if (strchr(topic, '#') != NULL || strchr(topic, '+') != NULL) {
+        return -1;
+    }
+    return nni_mqtt_msg_set_publish_topic(msg, topic);
 }
 
 const char *

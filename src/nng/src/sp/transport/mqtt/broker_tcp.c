@@ -671,16 +671,15 @@ tcptran_pipe_recv_cb(void *arg)
 	// as application message callback of users
 	nni_aio_list_remove(aio);
 	msg      = p->rxmsg;
-//	p->rxmsg = NULL;
+    // p->rxmsg = NULL;
 	n        = nni_msg_len(msg);
 	type     = p->rxlen[0] & 0xf0;
-    if (len <= 0 && (type == CMD_SUBSCRIBE || type == CMD_PUBLISH ||
-    CMD_UNSUBSCRIBE)) {
-        log_warn("Invaild Packet Type: Connection closed.");
-        rv = MALFORMED_PACKET;
-        goto recv_error;
-    }
-    p->rxmsg = NULL;
+	if (len <= 0 && (type == CMD_SUBSCRIBE || type == CMD_PUBLISH || CMD_UNSUBSCRIBE)) {
+	    log_warn("Invaild Packet Type: Connection closed.");
+	    rv = MALFORMED_PACKET;
+	    goto recv_error;
+	}
+	p->rxmsg = NULL;
 
 	fixed_header_adaptor(p->rxlen, msg);
 	nni_msg_set_conn_param(msg, cparam);

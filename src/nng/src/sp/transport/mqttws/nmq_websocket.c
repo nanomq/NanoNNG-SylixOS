@@ -245,17 +245,16 @@ done:
 					}
 				}
 
-				if (qos_pac == 1) {
-					ack_cmd = CMD_PUBACK;
-				} else if (qos_pac == 2) {
-					ack_cmd = CMD_PUBREC;
-				} else {
+                if (qos_pac == 1) {
+                    ack_cmd = CMD_PUBACK;
+                } else if (qos_pac == 2) {
+                    ack_cmd = CMD_PUBREC;
+                } else {
                     log_warn("Wrong QoS level!");
                     rv = PROTOCOL_ERROR;
                     goto recv_error;
                 }
-                if ((packet_id = nni_msg_get_pub_pid(msg)) ==
-                    0) {
+                if ((packet_id = nni_msg_get_pub_pid(msg)) == 0) {
                     rv = PROTOCOL_ERROR;
                     goto recv_error;
                 }

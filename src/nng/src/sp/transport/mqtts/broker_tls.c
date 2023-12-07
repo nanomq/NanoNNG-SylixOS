@@ -298,8 +298,6 @@ tlstran_pipe_nego_cb(void *arg)
     nni_mtx_lock(&ep->mtx);
 
     if ((rv = nni_aio_result(aio)) != 0) {
-
-        log_error("------------------ get aio fail\n");
         goto error;
     }
 
@@ -322,7 +320,6 @@ tlstran_pipe_nego_cb(void *arg)
         if (p->rxlen[0] != CMD_CONNECT) {
             log_warn("CMD TYPE %x", p->rxlen[0]);
             rv = NNG_EPROTO;
-            log_error("------------------wrong cmd type\n");
             goto error;
         }
         len =
@@ -331,7 +328,6 @@ tlstran_pipe_nego_cb(void *arg)
         rv            = (p->wantrxhead >= NANO_CONNECT_PACKET_LEN) ? 0
                                                                    : NNG_EPROTO;
         if (rv != 0) {
-            log_error("------------------wrong size\n");
             goto error;
         }
     }
@@ -384,7 +380,6 @@ tlstran_pipe_nego_cb(void *arg)
             if (p->tcp_cparam->pro_ver == 5) {
                 goto close;
             } else {
-                log_error("-------------conn_handler fail\n");
                 goto error;
             }
         }
