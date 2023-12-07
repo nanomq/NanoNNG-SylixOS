@@ -301,6 +301,11 @@ nng_mqtt_msg_get_publish_dup(nng_msg *msg)
 int
 nng_mqtt_msg_set_publish_topic(nng_msg *msg, const char *topic)
 {
+    // topic alias
+    if (topic == NULL) {
+        return 0;
+    }
+    // wild card
 	if (strchr(topic, '#') != NULL || strchr(topic, '+') != NULL) {
 		return -1;
 	}
