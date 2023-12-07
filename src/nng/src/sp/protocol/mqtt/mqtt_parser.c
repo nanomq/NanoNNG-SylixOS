@@ -281,6 +281,11 @@ copyn_str(const uint8_t *src, uint32_t *pos, int *str_len, int limit)
 	*str_len      = 0;
 	uint8_t *dest = NULL;
 
+	if (!src || !pos || limit < 2) {
+	        *str_len = 0;
+	        return NULL;
+	}
+
 	NNI_GET16(src + (*pos), *str_len);
 
 	*pos = (*pos) + 2;
