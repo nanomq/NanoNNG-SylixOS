@@ -524,6 +524,10 @@ tlstran_pipe_send_cb(void *arg)
             tlstran_pipe_send_start_v4(p, msg, txaio);
         else if (p->tcp_cparam->pro_ver == 5)
             tlstran_pipe_send_start_v5(p, msg, txaio);
+        else if (p->tcp_cparam->pro_ver == 3)
+            tlstran_pipe_send_start_v4(p, msg, txaio);
+        else
+            nni_aio_finish_error(txaio, NNG_EPROTO);
         nni_mtx_unlock(&p->mtx);
         return;
     }
@@ -1418,6 +1422,10 @@ tlstran_pipe_send_start(tlstran_pipe *p)
         tlstran_pipe_send_start_v4(p, msg, aio);
     } else if (p->tcp_cparam->pro_ver == 5) {
         tlstran_pipe_send_start_v5(p, msg, aio);
+    } else if (p->tcp_cparam->pro_ver == 3) {
+        tlstran_pipe_send_start_v4(p, msg, aio);
+    } else {
+        nni_aio_finish_error(aio, NNG_EPROTO);
     }
     return;
 }
