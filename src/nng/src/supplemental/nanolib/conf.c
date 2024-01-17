@@ -355,6 +355,7 @@ conf_basic_parse(conf *config, const char *path)
 
 	int   n;
 	char *value;
+	config->enable = true;
 	while (nano_getline(&line, &sz, fp) != -1) {
 		if ((value = get_conf_value(line, sz, "url")) != NULL) {
 			FREE_NONULL(config->url);
