@@ -302,6 +302,7 @@ typedef enum {
 struct conf {
 	char *   conf_file;
 	char *   url; // "nmq-tcp://addr:port"
+	bool 	 enable;
 	int      num_taskq_thread;
 	int      max_taskq_thread;
 	int      property_size;

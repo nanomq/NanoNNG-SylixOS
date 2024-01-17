@@ -364,6 +364,11 @@ conf_basic_parse(conf *config, const char *path)
 			config->daemon = nni_strcasecmp(value, "yes") == 0 ||
 			    nni_strcasecmp(value, "true") == 0;
 			nng_strfree(value);
+		} else if ((value = get_conf_value(line, sz, "enable")) !=
+		    NULL) {
+			config->enable = nni_strcasecmp(value, "yes") == 0 ||
+			    nni_strcasecmp(value, "true") == 0;
+			nng_strfree(value);
 		} else if ((value = get_conf_value(
 		                line, sz, "num_taskq_thread")) != NULL) {
 			n = atoi(value);
