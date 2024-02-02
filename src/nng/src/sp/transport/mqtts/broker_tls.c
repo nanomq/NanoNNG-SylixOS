@@ -689,11 +689,12 @@ tlstran_pipe_recv_cb(void *arg)
     n        = nni_msg_len(msg);
     type     = p->rxlen[0] & 0xf0;
     p->rxmsg = NULL;
-	if (nni_msg_len(msg) == 0 && (type == CMD_SUBSCRIBE || type == CMD_PUBLISH || CMD_UNSUBSCRIBE)) {
-	    log_warn("Invaild Packet Type: Connection closed.");
-	    rv = MALFORMED_PACKET;
-	    goto recv_error;
-	}
+    if (nni_msg_len(msg) == 0 && (type == CMD_SUBSCRIBE || type == CMD_PUBLISH || CMD_UNSUBSCRIBE))
+    {
+        log_warn("Invaild Packet Type: Connection closed.");
+        rv = MALFORMED_PACKET;
+        goto recv_error;
+    }
 
     fixed_header_adaptor(p->rxlen, msg);
     nni_msg_set_conn_param(msg, cparam);
@@ -840,9 +841,9 @@ tlstran_pipe_recv_cb(void *arg)
 
 recv_error:
     nni_aio_list_remove(aio);
-    if(msg != NULL)
+    if (msg != NULL)
         nni_msg_free(msg);
-    if(p->rxmsg)
+    if (p->rxmsg)
         nni_msg_free(p->rxmsg);
     msg = NULL;
     p->rxmsg = NULL;
@@ -1428,11 +1429,16 @@ tlstran_pipe_send_start(tlstran_pipe *p)
         nni_aio_finish(aio, NNG_ECANCELED, 0);
         return;
     }
-    if (p->tcp_cparam->pro_ver == MQTT_PROTOCOL_VERSION_v31 || MQTT_PROTOCOL_VERSION_v311) {
-		nmq_pipe_send_start_v4(p, msg, aio);
-	} else if (p->tcp_cparam->pro_ver == MQTT_PROTOCOL_VERSION_v5) {
-		nmq_pipe_send_start_v5(p, msg, aio);
-	} else {
+    if (p->tcp_cparam->pro_ver == MQTT_PROTOCOL_VERSION_v31 || MQTT_PROTOCOL_VERSION_v311)
+    {
+        tlstran_pipe_send_start_v4(p, msg, aio);
+    }
+    else if (p->tcp_cparam->pro_ver == MQTT_PROTOCOL_VERSION_v5)
+    {
+        tlstran_pipe_send_start_v5(p, msg, aio);
+    }
+    else
+    {
         log_error("pro_ver of the msg is not 3, 4 or 5");
         nni_aio_finish_error(aio, NNG_EPROTO);
     }
@@ -1898,7 +1904,7 @@ tlstran_ep_set_conf(void *arg, const void *v, size_t sz, nni_opt_type t)
     tlstran_ep *ep = arg;
     NNI_ARG_UNUSED(sz);
     NNI_ARG_UNUSED(t);
-    
+
     nni_mtx_lock(&ep->mtx);
     ep->conf = (conf *) v;
     nni_mtx_unlock(&ep->mtx);
