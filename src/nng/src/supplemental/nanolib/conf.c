@@ -371,7 +371,7 @@ conf_basic_parse(conf *config, const char *path)
 			    nni_strcasecmp(value, "true") == 0;
 			nng_strfree(value);
 		} else if ((value = get_conf_value(
-		                line, sz, "num_taskq_thread")) != NULL) {
+		                line, sz, "num_taskq_t  hread")) != NULL) {
 			n = atoi(value);
 			if (n > 0)
 				config->num_taskq_thread = atoi(value);

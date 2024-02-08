@@ -585,11 +585,14 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 	cparam->pro_name.body =
 	    (char *) copyn_utf8_str(packet, &pos, &len_of_str, max - pos);
 	cparam->pro_name.len = len_of_str;
-	// At least 4 bytes left in valid CONNECT
+	// At least 4 bytes left in valid CONNECT & proname must valid
 	rv = (len_of_str < 0 || pos + 4 > max) ? PROTOCOL_ERROR : 0;
+    if(rv != 0)
+        return rv;
 	log_trace("pro_name: %s", cparam->pro_name.body);
 	// protocol ver
 	cparam->pro_ver = packet[pos];
+    log_trace("pro_ver: %d", cparam->pro_ver);
 	pos++;
 	// connect flag
 	cparam->con_flag    = packet[pos];
@@ -611,6 +614,8 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 	// properties
 	if (cparam->pro_ver == MQTT_PROTOCOL_VERSION_v5) {
 		log_trace("MQTT V5 Properties");
+        if(pos >= max)
+            return PROTOCOL_ERROR;
 		cparam->properties = decode_buf_properties(
 		    packet, len, &pos, &cparam->prop_len, true);
 		if (cparam->properties) {
