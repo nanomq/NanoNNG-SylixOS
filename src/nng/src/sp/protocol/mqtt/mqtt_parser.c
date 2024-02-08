@@ -428,7 +428,7 @@ fixed_header_adaptor(uint8_t *packet, nng_msg *dst)
 	size_t   pos = 1;
 
 	m   = (nni_msg *) dst;
-	len = get_var_integer(packet, &pos);
+	len = get_var_integer(packet, (uint8_t *) &pos);
 	nni_msg_set_remaining_len(m, len);
 	rv = nni_msg_header_append(m, packet, pos);
 	return rv;
@@ -570,7 +570,7 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 {
 	uint32_t len, tmp, pos = 0;
 	uint8_t  rm_len = 0, len_of_var = 0;
-    int      len_of_str = 0;
+        int      len_of_str = 0;
 	int32_t  rv         = 0;
 
 	if (packet[pos] != CMD_CONNECT) {
@@ -581,7 +581,6 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 
 	// remaining length
 	len = get_var_integer(packet + pos, &rm_len);
-		log_error("in connect handler, len:%d, pos:%d, rm_len:%d", len, pos, rm_len);
 	pos += rm_len;
 	// protocol name
 	cparam->pro_name.body =
@@ -589,7 +588,7 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 	cparam->pro_name.len = len_of_str;
 	// At least 4 bytes left in valid CONNECT & proname must valid
 	rv = (len_of_str < 0 || pos + 4 > max) ? PROTOCOL_ERROR : 0;
-    if(rv != 0) return rv;
+        if(rv != 0) return rv;
 	log_trace("pro_name: %s", cparam->pro_name.body);
 	// protocol ver
 	cparam->pro_ver = packet[pos];
@@ -648,8 +647,8 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
         log_trace("PROTOCOL ERROR: No client id is found");
 		return (PROTOCOL_ERROR);
 	} else if(cparam->pro_ver == MQTT_PROTOCOL_VERSION_v31 && len_of_str > 23) {
-        log_trace("CLIENT_IDENTIFIER_NOT_VALID: Client id invaild");
-        return (CLIENT_IDENTIFIER_NOT_VALID);
+            log_trace("CLIENT_IDENTIFIER_NOT_VALID: Client id invaild");
+            return (CLIENT_IDENTIFIER_NOT_VALID);
         }
 	log_trace("clientid: [%s] [%d]", cparam->clientid.body, len_of_str);
 
