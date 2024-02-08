@@ -588,12 +588,11 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 	cparam->pro_name.len = len_of_str;
 	// At least 4 bytes left in valid CONNECT & proname must valid
 	rv = (len_of_str < 0 || pos + 4 > max) ? PROTOCOL_ERROR : 0;
-    if(rv != 0)
-        return rv;
+    if(rv != 0) return rv;
 	log_trace("pro_name: %s", cparam->pro_name.body);
 	// protocol ver
 	cparam->pro_ver = packet[pos];
-    log_trace("pro_ver: %d", cparam->pro_ver);
+        log_trace("pro_ver: %d", cparam->pro_ver);
 	pos++;
 	// connect flag
 	cparam->con_flag    = packet[pos];
@@ -645,10 +644,12 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 		cparam->clientid.len  = strlen(clientid_r);
 		cparam->assignedid    = true;
 	} else if (len_of_str < 0) {
+        log_trace("PROTOCOL ERROR: No client id is found");
 		return (PROTOCOL_ERROR);
 	} else if(cparam->pro_ver == MQTT_PROTOCOL_VERSION_v31 && len_of_str > 23) {
+        log_trace("CLIENT_IDENTIFIER_NOT_VALID: Client id invaild");
         return (CLIENT_IDENTIFIER_NOT_VALID);
-    }
+        }
 	log_trace("clientid: [%s] [%d]", cparam->clientid.body, len_of_str);
 
 	if (cparam->pro_ver == MQTT_PROTOCOL_VERSION_v5 && cparam->assignedid) {
