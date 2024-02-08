@@ -146,7 +146,7 @@ put_var_integer(uint8_t *dest, uint32_t value)
  * @return Integer value
  */
 uint32_t
-get_var_integer(const uint8_t *buf, uint32_t *pos)
+get_var_integer(const uint8_t *buf, uint8_t *pos)
 {
 	uint8_t  temp;
 	uint32_t result = 0;
@@ -428,7 +428,7 @@ fixed_header_adaptor(uint8_t *packet, nng_msg *dst)
 	size_t   pos = 1;
 
 	m   = (nni_msg *) dst;
-	len = get_var_integer(packet, (uint32_t *) &pos);
+	len = get_var_integer(packet, &pos);
 	nni_msg_set_remaining_len(m, len);
 	rv = nni_msg_header_append(m, packet, pos);
 	return rv;
@@ -450,7 +450,7 @@ ws_msg_adaptor(uint8_t *packet, nng_msg *dst)
 	size_t   pos = 1;
 
 	m   = (nni_msg *) dst;
-	len = get_var_integer(packet, (uint32_t *) &pos);
+	len = get_var_integer(packet, &pos);
 	nni_msg_set_cmd_type(m, *packet & 0xf0);
 	nni_msg_set_remaining_len(m, len);
 	rv = nni_msg_header_append(m, packet, pos);
@@ -580,7 +580,8 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 	}
 
 	// remaining length
-	len = (uint32_t) get_var_integer(packet + pos, &rm_len);
+	len = get_var_integer(packet + pos, &rm_len);
+		log_error("in connect handler, len:%d, pos:%d, rm_len:%d", len, pos, rm_len);
 	pos += rm_len;
 	// protocol name
 	cparam->pro_name.body =
@@ -728,7 +729,7 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 		    "password: %s %d", cparam->password.body, len_of_str);
 	}
 	if (len + rm_len + 1 != pos) {
-		log_error("in connect handler");
+		log_error("in connect handler, len:%d, pos:%d, rm_len:%d", len, pos, rm_len);
 		rv = PROTOCOL_ERROR;
 	}
 	return rv;
@@ -1122,8 +1123,8 @@ nano_msg_get_subtopic(nni_msg *msg, nano_pipe_db *root, conn_param *cparam)
 {
 	char *        topic;
 	nano_pipe_db *db = NULL, *tmp = NULL, *iter = NULL;
-	uint8_t       len_of_topic = 0, *payload_ptr;
-	uint32_t      len, len_of_varint = 0;
+	uint8_t       len_of_topic = 0, len_of_varint, *payload_ptr;
+	uint32_t      len = 0;
 	size_t        bpos = 0, remain = 0;
 	bool          repeat = false;
 
@@ -1304,8 +1305,8 @@ int
 nmq_subinfo_decode(nng_msg *msg, void *l, uint8_t ver)
 {
 	char           *topic;
-	uint8_t         *payload_ptr, *var_ptr;
-	uint32_t        num = 0, len, len_of_varint = 0, len_of_str = 0, subid = 0;
+	uint8_t         *payload_ptr, len_of_varint = 0, *var_ptr;
+	uint32_t        num = 0, len, len_of_str = 0, subid = 0;
 	uint16_t        len_of_topic = 0;
 	size_t          bpos = 0, remain = 0;
 	struct subinfo *sn = NULL;
@@ -1405,8 +1406,8 @@ int
 nmq_unsubinfo_decode(nng_msg *msg, void *l, uint8_t ver)
 {
 	char           *topic;
-	uint8_t         len_of_topic = 0, *payload_ptr, *var_ptr;
-	uint32_t        num = 0, len, len_of_varint = 0, len_of_str = 0;
+	uint8_t         len_of_topic = 0, len_of_varint = 0, *payload_ptr, *var_ptr;
+	uint32_t        num = 0, len, len_of_str = 0;
 	size_t          bpos = 0, remain = 0;
 	struct subinfo *sn = NULL, *sn2, snode;
 	nni_list       *ll = l;
