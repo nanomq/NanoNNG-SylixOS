@@ -568,8 +568,9 @@ conn_param_set_will_property(conn_param *cparam, property *prop)
 int32_t
 conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 {
-	uint32_t len, tmp, pos = 0, len_of_var = 0;
-	int      len_of_str = 0;
+	uint32_t len, tmp, pos = 0;
+	uint8_t  rm_len = 0, len_of_var = 0;
+    int      len_of_str = 0;
 	int32_t  rv         = 0;
 
 	if (packet[pos] != CMD_CONNECT) {
@@ -579,8 +580,8 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 	}
 
 	// remaining length
-	len = (uint32_t) get_var_integer(packet + pos, &len_of_var);
-	pos += len_of_var;
+	len = (uint32_t) get_var_integer(packet + pos, &rm_len);
+	pos += rm_len;
 	// protocol name
 	cparam->pro_name.body =
 	    (char *) copyn_utf8_str(packet, &pos, &len_of_str, max - pos);
@@ -616,6 +617,9 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 		log_trace("MQTT V5 Properties");
         if(pos >= max)
             return PROTOCOL_ERROR;
+        cparam->prop_len = (uint32_t) get_var_integer(packet + pos, &len_of_var);
+        if (cparam->prop_len > (max - pos - 1 - cparam->will_flag * 2))
+            return PROTOCOL_ERROR;
 		cparam->properties = decode_buf_properties(
 		    packet, len, &pos, &cparam->prop_len, true);
 		if (cparam->properties) {
@@ -642,7 +646,9 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 		cparam->assignedid    = true;
 	} else if (len_of_str < 0) {
 		return (PROTOCOL_ERROR);
-	}
+	} else if(cparam->pro_ver == MQTT_PROTOCOL_VERSION_v31 && len_of_str > 23) {
+        return (CLIENT_IDENTIFIER_NOT_VALID);
+    }
 	log_trace("clientid: [%s] [%d]", cparam->clientid.body, len_of_str);
 
 	if (cparam->pro_ver == MQTT_PROTOCOL_VERSION_v5 && cparam->assignedid) {
@@ -720,7 +726,7 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
 		log_trace(
 		    "password: %s %d", cparam->password.body, len_of_str);
 	}
-	if (len + len_of_var + 1 != pos) {
+	if (len + rm_len + 1 != pos) {
 		log_error("in connect handler");
 		rv = PROTOCOL_ERROR;
 	}
