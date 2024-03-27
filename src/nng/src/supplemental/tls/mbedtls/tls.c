@@ -181,6 +181,7 @@ net_recv(void *tls, unsigned char *buf, size_t len)
 static void
 conn_fini(nng_tls_engine_conn *ec)
 {
+	mbedtls_mutex_free( &mbedtls_threading_gmtime_mutex );
 	mbedtls_ssl_free(&ec->ctx);
 }
 
@@ -190,7 +191,7 @@ conn_init(nng_tls_engine_conn *ec, void *tls, nng_tls_engine_config *cfg)
 	int rv;
 
 	ec->tls = tls;
-    mbedtls_mutex_init( &mbedtls_threading_gmtime_mutex );
+	mbedtls_mutex_init( &mbedtls_threading_gmtime_mutex );
 	mbedtls_ssl_init(&ec->ctx);
 	mbedtls_ssl_set_bio(&ec->ctx, tls, net_send, net_recv, NULL);
 
