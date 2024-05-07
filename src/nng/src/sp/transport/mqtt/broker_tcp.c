@@ -183,6 +183,11 @@ tcptran_pipe_fini(void *arg)
 	tcptran_pipe *p = arg;
 	tcptran_ep   *ep;
 
+	//conn_param *cparam = p->tcp_cparam;
+	//if (cparam != NULL) {
+	//    log_error("clientid %s is fini cparam:%p clientid: %p", (char *) conn_param_get_clientid(cparam), cparam, &cparam->clientid);
+	//}
+
 	tcptran_pipe_stop(p);
 	if ((ep = p->ep) != NULL) {
 		nni_mtx_lock(&ep->mtx);
@@ -565,16 +570,18 @@ nmq_tcptran_pipe_send_cb(void *arg)
 static void
 tcptran_pipe_recv_cb(void *arg)
 {
-	nni_aio      *aio;
+	nni_aio      *aio = NULL;
 	nni_iov       iov[2];
-	uint8_t       type, rv;
+	uint8_t       type = 0;
+	uint8_t       rv = 0;
 	uint32_t      pos = 1;
 	uint64_t      len = 0;
-	size_t        n;
-	nni_msg      *msg, *qmsg;
+	size_t        n = 0;
+	nni_msg      *msg = NULL;
+	nni_msg      *qmsg = NULL;
 	tcptran_pipe *p     = arg;
 	nni_aio      *rxaio = p->rxaio;
-	conn_param   *cparam;
+	conn_param   *cparam = NULL;
 	bool          ack   = false;
 
 	log_trace("tcptran_pipe_recv_cb %p\n", p);
