@@ -869,6 +869,7 @@ tls_reap(void *arg)
 	if (conn->tcp_recv_buf != NULL) {
 		nni_free(conn->tcp_recv_buf, NNG_TLS_MAX_RECV_SIZE);
 	}
+	nni_mtx_fini(&conn->lock);
 	NNI_FREE_STRUCT(conn);
 }
 

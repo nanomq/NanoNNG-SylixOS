@@ -820,6 +820,7 @@ print_conf(conf *nanomq_conf)
 	}
 
 	print_bridge_conf(&nanomq_conf->bridge, "");
+	log_error("nanomq start.....");
 }
 
 static void

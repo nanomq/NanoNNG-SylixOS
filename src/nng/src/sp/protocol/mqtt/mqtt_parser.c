@@ -650,7 +650,7 @@ conn_handler(uint8_t *packet, conn_param *cparam, size_t max)
             log_trace("CLIENT_IDENTIFIER_NOT_VALID: Client id invaild");
             return (CLIENT_IDENTIFIER_NOT_VALID);
         }
-	log_trace("clientid: [%s] [%d]", cparam->clientid.body, len_of_str);
+	log_error("clientid: [%s] [%d] is online", cparam->clientid.body, len_of_str);
 
 	if (cparam->pro_ver == MQTT_PROTOCOL_VERSION_v5 && cparam->assignedid) {
 		property *assigned_cid =

@@ -232,9 +232,19 @@ nano_pipe_timer_cb(void *arg)
 		nni_mtx_unlock(&p->lk);
 		return;
 	}
+ //   log_error("clientid: %s, current: %lu - expect: %f",
+ //           (char *) conn_param_get_clientid(p->conn_param),
+ //           p->ka_refresh * (qos_duration) * 1000,
+ //           p->keepalive * qos_backoff * 1000);
+ //   log_error("clientid: %s, ka_refresh: %u qos_duration: %u keepalive: %u qos_backoff: %f",
+ //                                                               (char *) conn_param_get_clientid(p->conn_param),
+ //                                                               p->ka_refresh,
+ //                                                               qos_duration, p->keepalive,
+ //                                                               qos_backoff);
 	qos_backoff = p->ka_refresh * (qos_duration) *1000 -
 	    p->keepalive * qos_backoff * 1000;
 	if (qos_backoff > 0) {
+	    log_error("clientid: %s qos_backoff > 0 yes! kick client", (char *) conn_param_get_clientid(p->conn_param));
 		nni_println(
 		    "Warning: close pipe & kick client due to KeepAlive "
 		    "timeout!");
@@ -243,6 +253,7 @@ nano_pipe_timer_cb(void *arg)
 		nni_aio_finish_error(&p->aio_recv, NNG_ECONNREFUSED);
 		return;
 	}
+//	log_error("clientid: %s qos_backoff <= 0! not kick: ka_refresh: %u", (char *) conn_param_get_clientid(p->conn_param), p->ka_refresh);
 	p->ka_refresh++;
 
 	if (!p->busy) {
@@ -776,6 +787,11 @@ nano_pipe_close(void *arg)
 	if (p->conn_param->clean_start == 0) {
 		// cache this pipe
 		clientid = (char *) conn_param_get_clientid(p->conn_param);
+	}
+	if (conn_param_get_clientid(p->conn_param) != NULL) {
+	    log_error("clientid: %s is fini", (char *) conn_param_get_clientid(p->conn_param));
+	} else {
+	    log_error("clientid is NULL");
 	}
 	if (clientid) {
 		clientid_key = DJBHashn(clientid, strlen(clientid));

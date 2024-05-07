@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#if defined(NNG_SUPP_SQLITE)
+#if 0
 #include "mqtt_qos_db.h"
 
 #include "sqlite3.h"
