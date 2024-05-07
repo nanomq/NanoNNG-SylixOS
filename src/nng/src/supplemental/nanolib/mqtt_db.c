@@ -908,6 +908,7 @@ delete_dbtree_node(dbtree_node *node, size_t index)
 		cvector_free(node_t->clients);
 		free(node_t->topic);
 		cvector_erase(node->child, index);
+		nni_rwlock_fini(&(node_t->rwlock));
 		free(node_t);
 		node_t = NULL;
 		if (index == 0) {

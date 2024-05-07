@@ -91,7 +91,7 @@ nni_sp_tran_sys_init(void)
 	nni_sp_inproc_register();
 #endif
 #ifdef NNG_TRANSPORT_IPC
-	nni_sp_ipc_register();
+//  nni_sp_ipc_register();
 #endif
 #ifdef NNG_TRANSPORT_TCP
 	nni_sp_tcp_register();

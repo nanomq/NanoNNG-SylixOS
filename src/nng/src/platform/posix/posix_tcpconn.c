@@ -73,6 +73,8 @@ tcp_dowrite(nni_tcp_conn *c)
             case EINTR:
                 continue;
             case EAGAIN:
+                log_error("rhack: EAGAIN caused! msleep 500");
+                nng_msleep(500);
 #ifdef EWOULDBLOCK
 #if EWOULDBLOCK != EAGAIN
 			case EWOULDBLOCK:
