@@ -9,7 +9,8 @@
 #endif
 
 #if defined(NNG_SUPP_SQLITE)
-#include "sqlite3.h"
+#undef NNG_SUPP_SQLITE
+//#include "sqlite3.h"
 #endif
 
 struct nng_mqtt_sqlite_option {
