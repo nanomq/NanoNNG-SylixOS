@@ -31,7 +31,6 @@ typedef struct tcptran_ep   tcptran_ep;
 struct tcptran_pipe {
 	nng_stream *conn;
 	nni_pipe   *npipe; // for statitical
-	conf     *conf;
 	// uint16_t        peer;		//reserved for MQTT sdk version
 	// uint16_t        proto;
 	size_t          rcvmax;	//duplicate with conf->max_packet_size
@@ -52,6 +51,7 @@ struct tcptran_pipe {
 	nni_msg        *rxmsg, *cnmsg;
 	nni_mtx         mtx;
 	conn_param     *tcp_cparam;
+	const conf     *conf;
 	nni_list        recvq;
 	nni_list        sendq;
 	nni_list_node   node;
@@ -153,6 +153,7 @@ tcptran_pipe_stop(void *arg)
 {
 	tcptran_pipe *p = arg;
 	log_info(" ###### tcptran_pipe_stop ###### ");
+	p->tcp_cparam = NULL;
 	nni_aio_stop(p->qsaio);
 	nni_aio_stop(p->rpaio);
 	nni_aio_stop(p->rxaio);
@@ -170,10 +171,10 @@ tcptran_pipe_init(void *arg, nni_pipe *npipe)
 	nni_pipe_set_conn_param(npipe, p->tcp_cparam);
 	p->npipe = npipe;
 	if (!p->conf->sqlite.enable) {
-		nni_qos_db_init_id_hash(npipe->nano_qos_db);
+		nni_qos_db_init_id_hash(p->npipe->nano_qos_db);
 	}
-	p->conn_buf = NULL;
-	p->busy     = false;
+	p->conn_buf   = NULL;
+	p->busy       = false;
 
 	nni_lmq_init(&p->rslmq, 16);
 	p->qos_buf = nng_zalloc(16 + NNI_NANO_MAX_PACKET_SIZE);
@@ -185,11 +186,6 @@ tcptran_pipe_fini(void *arg)
 {
 	tcptran_pipe *p = arg;
 	tcptran_ep   *ep;
-
-	//conn_param *cparam = p->tcp_cparam;
-	//if (cparam != NULL) {
-	//    log_error("clientid %s is fini cparam:%p clientid: %p", (char *) conn_param_get_clientid(cparam), cparam, &cparam->clientid);
-	//}
 
 	tcptran_pipe_stop(p);
 	if ((ep = p->ep) != NULL) {
@@ -212,6 +208,8 @@ tcptran_pipe_fini(void *arg)
 	nni_aio_free(p->txaio);
 	nni_aio_free(p->negoaio);
 	nng_stream_free(p->conn);
+	if (p->rxmsg != NULL)
+		nni_msg_free(p->rxmsg);
 	nni_lmq_fini(&p->rslmq);
 	nni_mtx_fini(&p->mtx);
 	NNI_FREE_STRUCT(p);
@@ -272,7 +270,7 @@ tcptran_ep_match(tcptran_ep *ep)
 	nni_list_append(&ep->busypipes, p);
 	ep->useraio = NULL;
 	p->rcvmax   = ep->rcvmax;
-    p->conf     = ep->conf;
+
 	nni_aio_set_output(aio, 0, p);
 	nni_aio_finish(aio, 0, 0);
 }
@@ -360,10 +358,6 @@ tcptran_pipe_nego_cb(void *arg)
 		if ((rv = conn_handler(p->conn_buf, p->tcp_cparam, p->wantrxhead)) == 0) {
 			nng_free(p->conn_buf, p->wantrxhead);
 			p->conn_buf = NULL;
-            // we don't need to alloc a new msg, just use pipe.
-            // We are all ready now.  We put this in the wait list,
-            // and then try to run the matcher.
-
 			// Connection is accepted.
 			if (p->tcp_cparam->pro_ver == 5) {
 				p->qsend_quota = p->tcp_cparam->rx_max;
@@ -611,18 +605,16 @@ exit:
 static void
 tcptran_pipe_recv_cb(void *arg)
 {
-	nni_aio      *aio = NULL;
+	nni_aio      *aio;
 	nni_iov       iov[2];
-	uint8_t       type = 0;
-	uint8_t       rv = 0;
+	uint8_t       type, rv;
 	uint32_t      pos = 1;
 	uint64_t      len = 0;
-	size_t        n = 0;
-	nni_msg      *msg = NULL;
-	nni_msg      *qmsg = NULL;
+	size_t        n;
+	nni_msg      *msg, *qmsg;
 	tcptran_pipe *p     = arg;
 	nni_aio      *rxaio = p->rxaio;
-	conn_param   *cparam = NULL;
+	conn_param   *cparam;
 	bool          ack   = false;
 
 	log_trace("tcptran_pipe_recv_cb %p\n", p);
@@ -745,17 +737,17 @@ tcptran_pipe_recv_cb(void *arg)
 	// as application message callback of users
 	nni_aio_list_remove(aio);
 	msg      = p->rxmsg;
+    // p->rxmsg = NULL;
 	n        = nni_msg_len(msg);
 	type     = p->rxlen[0] & 0xf0;
-    p->rxmsg = NULL;
-    if (nni_msg_len(msg) == 0 && (type == CMD_SUBSCRIBE || type == CMD_PUBLISH || CMD_UNSUBSCRIBE))
-    {
-        log_warn("Invaild Packet Type: Connection closed.");
-        rv = MALFORMED_PACKET;
-        goto recv_error;
-    }
+	if (len <= 0 && (type == CMD_SUBSCRIBE || type == CMD_PUBLISH || CMD_UNSUBSCRIBE)) {
+	    log_warn("Invaild Packet Type: Connection closed.");
+	    rv = MALFORMED_PACKET;
+	    goto recv_error;
+	}
+	p->rxmsg = NULL;
 
-    fixed_header_adaptor(p->rxlen, msg);
+	fixed_header_adaptor(p->rxlen, msg);
 	nni_msg_set_conn_param(msg, cparam);
 	// duplicated with fixed_header_adaptor
 	nni_msg_set_remaining_len(msg, len);
@@ -789,15 +781,8 @@ tcptran_pipe_recv_cb(void *arg)
 				ack_cmd = CMD_PUBACK;
 			} else if (qos_pac == 2) {
 				ack_cmd = CMD_PUBREC;
-			} else {
-                log_warn("Wrong QoS level!");
-                rv = PROTOCOL_ERROR;
-                goto recv_error;
-            }
-            if ((packet_id = nni_msg_get_pub_pid(msg)) == 0) {
-                rv = PROTOCOL_ERROR;
-                goto recv_error;
-            }
+			}
+			packet_id = nni_msg_get_pub_pid(msg);
 			ack       = true;
 		}
 	} else if (type == CMD_PUBREC) {
@@ -844,6 +829,7 @@ tcptran_pipe_recv_cb(void *arg)
 		// if (prop != NULL) {
 		// nni_msg_proto_set_property(qmsg, prop);
 		// }
+		// aio_begin?
 		if (p->busy == false) {
 			iov[0].iov_len = nni_msg_header_len(qmsg);
 			iov[0].iov_buf = nni_msg_header(qmsg);
@@ -898,11 +884,9 @@ tcptran_pipe_recv_cb(void *arg)
 
 recv_error:
 	nni_aio_list_remove(aio);
-    if (msg != NULL)
-        nni_msg_free(msg);
-    if (p->rxmsg)
-        nni_msg_free(p->rxmsg);
-    msg = NULL;
+	nni_msg_free(msg);
+	nni_msg_free(p->rxmsg);
+	msg = NULL;
 	p->rxmsg = NULL;
 	nni_pipe_bump_error(p->npipe, rv);
 	nni_mtx_unlock(&p->mtx);
@@ -976,7 +960,7 @@ nmq_pipe_send_start_v4(tcptran_pipe *p, nni_msg *msg, nni_aio *aio)
 	int       qlen = 0, topic_len = 0;
 	char     *topic       = nni_msg_get_pub_topic(msg, &topic_len);
 	subinfo  *tinfo = NULL, *info = NULL;
-	nni_list *subinfol = &p->npipe->subinfol;
+	nni_list *subinfol = p->npipe->subinfol;
 
 	txaio = p->txaio;
 	tinfo = nni_aio_get_prov_data(txaio);
@@ -1247,7 +1231,7 @@ nmq_pipe_send_start_v5(tcptran_pipe *p, nni_msg *msg, nni_aio *aio)
 	tinfo = nni_aio_get_prov_data(txaio);
 
 	nni_aio_set_prov_data(txaio, NULL);
-	NNI_LIST_FOREACH (&p->npipe->subinfol, info) {
+	NNI_LIST_FOREACH (p->npipe->subinfol, info) {
 		if (tinfo != NULL && info != tinfo) {
 			continue;
 		}
@@ -1460,20 +1444,14 @@ tcptran_pipe_send_start(tcptran_pipe *p)
 		nni_aio_finish(aio, NNG_ECANCELED, 0);
 		return;
 	}
-    if (p->tcp_cparam->pro_ver == MQTT_PROTOCOL_VERSION_v31 || MQTT_PROTOCOL_VERSION_v311)
-    {
+	if (p->tcp_cparam->pro_ver == 4) {
+		nmq_pipe_send_start_v4(p, msg, aio);
+	} else if (p->tcp_cparam->pro_ver == 5) {
+		nmq_pipe_send_start_v5(p, msg, aio);
+	} else if (p->tcp_cparam->pro_ver == 3) {
         nmq_pipe_send_start_v4(p, msg, aio);
     }
-    else if (p->tcp_cparam->pro_ver == MQTT_PROTOCOL_VERSION_v5)
-    {
-        nmq_pipe_send_start_v5(p, msg, aio);
-    }
-    else
-    {
-        log_error("pro_ver of the msg is not 3, 4 or 5");
-        nni_aio_finish_error(aio, NNG_EPROTO);
-    }
-    return;
+	return;
 }
 
 static void
@@ -1602,8 +1580,8 @@ tcptran_pipe_start(tcptran_pipe *p, nng_stream *conn, tcptran_ep *ep)
 
 	p->conn = conn;
 	p->ep   = ep;
-    p->conf = ep->conf;
-    // p->proto = ep->proto;
+	p->conf = ep->conf;
+	// p->proto = ep->proto;
 
 	log_trace("tcptran_pipe_start!");
 	p->qrecv_quota = NANO_MAX_QOS_PACKET;
@@ -1652,6 +1630,7 @@ tcptran_ep_close(void *arg)
 	tcptran_pipe *p;
 
 	nni_mtx_lock(&ep->mtx);
+
 	log_trace("tcptran_ep_close");
 	ep->closed = true;
 	nni_aio_close(ep->timeaio);
