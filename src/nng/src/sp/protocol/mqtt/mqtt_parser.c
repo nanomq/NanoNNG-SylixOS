@@ -142,7 +142,7 @@ put_var_integer(uint8_t *dest, uint32_t value)
  * Get variable integer value
  *
  * @param buf Byte array
- * @param pos how many bits rlen occupied
+ * @param pos how many bits rlen occupied (accumulated value)
  * @return Integer value
  */
 uint32_t
