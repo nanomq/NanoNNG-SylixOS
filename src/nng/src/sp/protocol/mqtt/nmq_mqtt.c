@@ -235,7 +235,7 @@ nano_pipe_timer_cb(void *arg)
 	qos_backoff = p->ka_refresh * (qos_duration) *1000 -
 	    p->keepalive * qos_backoff * 1000;
 	if (qos_backoff > 0) {
-		nni_println(
+		log_warn(
 		    "Warning: close pipe & kick client due to KeepAlive "
 		    "timeout!");
 		p->reason_code = NMQ_KEEP_ALIVE_TIMEOUT;
@@ -360,7 +360,10 @@ nano_ctx_send(void *arg, nni_aio *aio)
 	int              rv;
 	uint32_t         pipe    = 0;
 	uint8_t          qos_pac = 0;
+	uint8_t          qos     = 0;
 	uint16_t         packetid;
+	char *           pld_pac = NULL;
+	int              tlen_pac = 0;
 
 	bool is_sqlite = s->conf->sqlite.enable;
 
@@ -369,7 +372,7 @@ nano_ctx_send(void *arg, nni_aio *aio)
 	if (nni_aio_begin(aio) != 0) {
 		nni_msg_free(msg);
 		// AIO ERROR
-		log_error("Please report this bug");
+		log_error("aio misuesed!");
 		return;
 	}
 
@@ -381,8 +384,7 @@ nano_ctx_send(void *arg, nni_aio *aio)
 	} else {
 		pipe = ctx->pipe_id; // reply to self
 	}
-	ctx->pipe_id =
-	    0; // ensure connack/PING/DISCONNECT/PUBACK only sends once
+	ctx->pipe_id = 0;
 
 	if (ctx == &s->ctx) {
 		nni_pollable_clear(&s->writable);
@@ -400,28 +402,36 @@ nano_ctx_send(void *arg, nni_aio *aio)
 		nni_msg_free(msg);
 		return;
 	}
-
-	// 2 locks here cause performance degradation
 	nni_mtx_lock(&p->lk);
-	nni_mtx_unlock(&s->lk);
-
 	if (p->pipe->cache) {
 		if (nni_msg_get_type(msg) == CMD_PUBLISH) {
 			qos_pac = nni_msg_get_pub_qos(msg);
+			pld_pac = nni_msg_get_pub_topic(msg, &tlen_pac);
 		}
-		if (qos_pac > 0) {
+		subinfo *info = NULL;
+		NNI_LIST_FOREACH(&p->pipe->subinfol, info) {
+			if (!info)
+				continue;
+			if (topic_filtern(info->topic, pld_pac, tlen_pac)) {
+				qos = qos_pac > info->qos ? info->qos : qos_pac; // MIN
+				break;
+			}
+		}
+		if (qos > 0) {
 			packetid = nni_pipe_inc_packetid(p->pipe);
 			nni_qos_db_set(is_sqlite, p->pipe->nano_qos_db,
 			    p->pipe->p_id, packetid, msg);
 			nni_qos_db_remove_oldest(is_sqlite,
 			    p->pipe->nano_qos_db,
 			    s->conf->sqlite.disk_cache_size);
-			log_trace("msg cached for session");
+			log_debug("msg cached for session");
 		} else {
 			// only cache QoS messages
+			log_debug("Drop msg due to qos == 0");
 			nni_msg_free(msg);
 		}
 		nni_mtx_unlock(&p->lk);
+		nni_mtx_unlock(&s->lk);
 		nni_aio_set_msg(aio, NULL);
 		return;
 	}
@@ -431,6 +441,7 @@ nano_ctx_send(void *arg, nni_aio *aio)
 		nni_aio_set_msg(&p->aio_send, msg);
 		nni_pipe_send(p->pipe, &p->aio_send);
 		nni_mtx_unlock(&p->lk);
+		nni_mtx_unlock(&s->lk);
 		nni_aio_set_msg(aio, NULL);
 		return;
 	}
@@ -438,6 +449,7 @@ nano_ctx_send(void *arg, nni_aio *aio)
 	if ((rv = nni_aio_schedule(aio, nano_ctx_cancel_send, ctx)) != 0) {
 		nni_msg_free(msg);
 		nni_mtx_unlock(&p->lk);
+		nni_mtx_unlock(&s->lk);
 		return;
 	}
 	log_warn("pipe %d occupied! resending in cb!", pipe);
@@ -457,6 +469,7 @@ nano_ctx_send(void *arg, nni_aio *aio)
 			    "Warning: msg lost due to reach the limit of lmq");
 			nni_msg_free(msg);
 			nni_mtx_unlock(&p->lk);
+			nni_mtx_unlock(&s->lk);
 			nni_aio_set_msg(aio, NULL);
 			return;
 		}
@@ -465,6 +478,7 @@ nano_ctx_send(void *arg, nni_aio *aio)
 	nni_lmq_put(&p->rlmq, msg);
 
 	nni_mtx_unlock(&p->lk);
+	nni_mtx_unlock(&s->lk);
 	nni_aio_set_msg(aio, NULL);
 	return;
 }
@@ -480,6 +494,7 @@ nano_sock_fini(void *arg)
 #endif
 	nni_id_map_fini(&s->pipes);
 	nni_id_map_fini(&s->cached_sessions);
+	nano_nni_lmq_flush(&s->waitlmq);
 	nni_lmq_fini(&s->waitlmq);
 	nano_ctx_fini(&s->ctx);
 	nni_pollable_fini(&s->writable);
@@ -537,40 +552,59 @@ nano_pipe_stop(void *arg)
 	if (p->pipe->cache)
 		return; // your time is yet to come
 
-	log_trace(" ########## nano_pipe_stop ########## ");
+	log_info(" ########## nano_pipe_stop ########## ");
 	nni_aio_stop(&p->aio_send);
+	log_info(" aio_send stopped ");
 	nni_aio_stop(&p->aio_timer);
+	log_info(" aio_timer stopped ");
 	nni_aio_stop(&p->aio_recv);
+	log_info(" aio_recv stopped ");
 }
 
 static void
 nano_pipe_fini(void *arg)
 {
 	nano_pipe *p = arg;
+	nano_sock *s = p->broker;
 	nng_msg   *msg;
 
 	log_trace(" ########## nano_pipe_fini ########## ");
 	if (p->pipe->cache) {
 		return; // your time is yet to come
 	}
+	nni_mtx_lock(&s->lk);
+	nni_mtx_lock(&p->lk);
 	if ((msg = nni_aio_get_msg(&p->aio_recv)) != NULL) {
 		nni_aio_set_msg(&p->aio_recv, NULL);
+	}
+	if ((msg = nni_aio_get_msg(&p->aio_send)) != NULL) {
+		nni_aio_set_msg(&p->aio_send, NULL);
 		nni_msg_free(msg);
 	}
 
+	//Safely free the msgs in qos_db, only when nano_qos_db is not taken by new pipe
 	void *nano_qos_db = p->pipe->nano_qos_db;
-
-	// TODO safely free the msgs in qos_db
 	if (p->event == true) {
-		if (!p->broker->conf->sqlite.enable) {
+		if (!p->broker->conf->sqlite.enable && nano_qos_db != NULL) {
+			nni_qos_db_remove_all_msg(false,
+				nano_qos_db, nmq_close_unack_msg_cb);
 			nni_qos_db_fini_id_hash(nano_qos_db);
+			p->pipe->nano_qos_db = NULL;
 		}
 	} else {
 		// we keep all structs in broker layer, except this conn_param
 		conn_param_free(p->conn_param);
 	}
+	nni_mtx_unlock(&p->lk);
 
 	nni_mtx_fini(&p->lk);
+	nni_mtx_unlock(&s->lk);
+
+	if (nni_aio_busy(&p->aio_send)) {
+		nni_aio_abort(&p->aio_send, NNG_ECANCELED);
+		nni_aio_close(&p->aio_send);
+		log_error("send aio not finished!");
+	}
 	nni_aio_fini(&p->aio_send);
 	nni_aio_fini(&p->aio_recv);
 	nni_aio_fini(&p->aio_timer);
@@ -600,8 +634,11 @@ nano_pipe_init(void *arg, nni_pipe *pipe, void *s)
 	p->ka_refresh  = 0;
 	p->event       = true;
 	p->tree        = sock->db;
-	p->keepalive   = p->conn_param->keepalive_mqtt;
-
+	if (p->conn_param != NULL)
+		p->keepalive   = p->conn_param->keepalive_mqtt;
+	if (!p->broker->conf->sqlite.enable && pipe->nano_qos_db == NULL) {
+		nni_qos_db_init_id_hash(pipe->nano_qos_db);
+	}
 	return (0);
 }
 
@@ -737,18 +774,18 @@ nano_pipe_start(void *arg)
 static inline void
 close_pipe(nano_pipe *p)
 {
+	nano_pipe *t = NULL;
 	nano_sock *s = p->broker;
-
-	nni_aio_close(&p->aio_send);
-	nni_aio_close(&p->aio_recv);
-	nni_aio_close(&p->aio_timer);
-	nni_mtx_lock(&p->lk);
 	p->closed = true;
+	// nni_atomic_swap_bool(&p->pipe->p_closed, true);
 	if (nni_list_active(&s->recvpipes, p)) {
+		nni_msg *msg = nni_aio_get_msg(&p->aio_recv);
+		if (msg)
+			nni_msg_free(msg);
+		conn_param_free(p->conn_param);
 		nni_list_remove(&s->recvpipes, p);
 	}
 	nano_nni_lmq_flush(&p->rlmq);
-	nni_mtx_unlock(&p->lk);
 	nni_id_remove(&s->pipes, nni_pipe_id(p->pipe));
 }
 
@@ -771,6 +808,7 @@ nano_pipe_close(void *arg)
 		return -1;
 	}
 	nni_mtx_lock(&s->lk);
+	nni_mtx_lock(&p->lk);
 	// we freed the conn_param when restoring pipe
 	// so check status of conn_param. just let it close silently
 	if (p->conn_param->clean_start == 0) {
@@ -780,7 +818,6 @@ nano_pipe_close(void *arg)
 	if (clientid) {
 		clientid_key = DJBHashn(clientid, strlen(clientid));
 		nni_id_set(&s->cached_sessions, clientid_key, p);
-		nni_mtx_lock(&p->lk);
 		// set event to false avoid of sending the disconnecting msg
 		p->event                   = false;
 		npipe->cache               = true;
@@ -790,9 +827,16 @@ nano_pipe_close(void *arg)
 			nni_list_remove(&s->recvpipes, p);
 		}
 		nano_nni_lmq_flush(&p->rlmq);
-		nni_mtx_unlock(&s->lk);
 		nni_mtx_unlock(&p->lk);
+		nni_mtx_unlock(&s->lk);
 		return -1;
+	} else {
+		nni_aio_close(&p->aio_send);
+		log_info("aio_send closed!");
+		nni_aio_close(&p->aio_recv);
+		log_info("aio_recv closed!");
+		nni_aio_close(&p->aio_timer);
+		log_info("aio_timer closed!");
 	}
 	close_pipe(p);
 
@@ -803,6 +847,7 @@ nano_pipe_close(void *arg)
 		msg =
 		    nano_msg_notify_disconnect(p->conn_param, p->reason_code);
 		if (msg == NULL) {
+			nni_mtx_unlock(&p->lk);
 			nni_mtx_unlock(&s->lk);
 			return 0;
 		}
@@ -817,6 +862,7 @@ nano_pipe_close(void *arg)
 			aio       = ctx->raio;
 			ctx->raio = NULL;
 			nni_list_remove(&s->recvq, ctx);
+			nni_mtx_unlock(&p->lk);
 			nni_mtx_unlock(&s->lk);
 			nni_aio_set_msg(aio, msg);
 			nni_aio_finish(aio, 0, nni_msg_len(msg));
@@ -827,11 +873,14 @@ nano_pipe_close(void *arg)
 				if (nni_lmq_resize(&s->waitlmq,
 				        nni_lmq_cap(&s->waitlmq) * 2) != 0) {
 					log_error("wait lmq resize failed.");
+					conn_param_free(p->conn_param);
+					nni_msg_free(msg);
 				}
 			}
 			nni_lmq_put(&s->waitlmq, msg);
 		}
 	}
+	ni_mtx_unlock(&p->lk);
 	nni_mtx_unlock(&s->lk);
 	return 0;
 }
@@ -841,11 +890,13 @@ nano_pipe_send_cb(void *arg)
 {
 	nano_pipe *p = arg;
 	nni_msg   *msg;
+	int rv;
 
 	log_trace("******** nano_pipe_send_cb %d ****", p->id);
 	// retry here
-	if (nni_aio_result(&p->aio_send) != 0) {
+	if ((rv = nni_aio_result(&p->aio_send)) != 0) {
 		msg = nni_aio_get_msg(&p->aio_send);
+		log_info("send cb error result %d", rv);
 		nni_msg_free(msg);
 		nni_aio_set_msg(&p->aio_send, NULL);
 		// possibily due to client crashed
@@ -896,6 +947,7 @@ nano_ctx_recv(void *arg, nni_aio *aio)
 	nni_msg *msg = NULL;
 
 	if (nni_aio_begin(aio) != 0) {
+		log_warn("recv aio begin failed!");
 		return;
 	}
 
@@ -931,6 +983,12 @@ nano_ctx_recv(void *arg, nni_aio *aio)
 		nni_mtx_unlock(&s->lk);
 		return;
 	}
+	if (nni_atomic_get_bool(&p->pipe->p_closed)) {
+		log_error("recv on a closed pipe!!");
+		nni_mtx_unlock(&s->lk);
+		nni_aio_finish(aio, 0, 0);
+		return;
+	}
 	msg = nni_aio_get_msg(&p->aio_recv);
 	nni_aio_set_msg(&p->aio_recv, NULL);
 	nni_list_remove(&s->recvpipes, p);
@@ -941,8 +999,6 @@ nano_ctx_recv(void *arg, nni_aio *aio)
 	if ((ctx == &s->ctx) && !p->busy) {
 		nni_pollable_raise(&s->writable);
 	}
-
-	// TODO MQTT 5 property
 
 	ctx->pipe_id = nni_pipe_id(p->pipe);
 	log_trace("nano_ctx_recv ends %p pipe: %p pipe_id: %d", ctx, p,
