@@ -197,10 +197,10 @@ tcptran_pipe_fini(void *arg)
 		}
 		nni_mtx_unlock(&ep->mtx);
 	}
-	if (p->tcp_cparam) {
-		conn_param_free(p->tcp_cparam);
-		p->tcp_cparam = NULL;
-	}
+//	if (p->tcp_cparam) {
+//		conn_param_free(p->tcp_cparam);
+//		p->tcp_cparam = NULL;
+//	}
 	nng_free(p->qos_buf, 16 + NNI_NANO_MAX_PACKET_SIZE);
 	nni_aio_free(p->qsaio);
 	nni_aio_free(p->rpaio);
@@ -270,6 +270,7 @@ tcptran_ep_match(tcptran_ep *ep)
 	nni_list_append(&ep->busypipes, p);
 	ep->useraio = NULL;
 	p->rcvmax   = ep->rcvmax;
+	p->conf = ep->conf;
 
 	nni_aio_set_output(aio, 0, p);
 	nni_aio_finish(aio, 0, 0);
@@ -605,16 +606,16 @@ exit:
 static void
 tcptran_pipe_recv_cb(void *arg)
 {
-	nni_aio      *aio;
+	nni_aio      *aio = NULL;
 	nni_iov       iov[2];
-	uint8_t       type, rv;
+	uint8_t       type = 0, rv = 0;
 	uint32_t      pos = 1;
 	uint64_t      len = 0;
-	size_t        n;
-	nni_msg      *msg, *qmsg;
+	size_t        n = 0;
+	nni_msg      *msg = NULL, *qmsg = NULL;
 	tcptran_pipe *p     = arg;
 	nni_aio      *rxaio = p->rxaio;
-	conn_param   *cparam;
+	conn_param   *cparam = NULL;
 	bool          ack   = false;
 
 	log_trace("tcptran_pipe_recv_cb %p\n", p);
@@ -635,7 +636,8 @@ tcptran_pipe_recv_cb(void *arg)
 		}
 		goto recv_error;
 	}
-
+	if (p->closed)
+	    goto recv_error;
 	n = nni_aio_count(rxaio);
 	p->gotrxhead += n;
 
@@ -712,11 +714,6 @@ tcptran_pipe_recv_cb(void *arg)
 			rv = NMQ_SERVER_UNAVAILABLE;
 			goto recv_error;
 		}
-		nni_msg_set_remaining_len(p->rxmsg, len);
-		if ((rv = nni_msg_header_append(p->rxmsg, p->rxlen, pos+1)) != 0) {
-			rv = NMQ_SERVER_UNAVAILABLE;
-			goto recv_error;
-		}
 
 		// Submit the rest of the data for a read -- seperate Fixed
 		// header with variable header and so on
@@ -781,6 +778,9 @@ tcptran_pipe_recv_cb(void *arg)
 				ack_cmd = CMD_PUBACK;
 			} else if (qos_pac == 2) {
 				ack_cmd = CMD_PUBREC;
+			} else {
+			    log_warn("wrong qos level");
+			    goto recv_error;
 			}
 			packet_id = nni_msg_get_pub_pid(msg);
 			ack       = true;
@@ -884,8 +884,10 @@ tcptran_pipe_recv_cb(void *arg)
 
 recv_error:
 	nni_aio_list_remove(aio);
-	nni_msg_free(msg);
-	nni_msg_free(p->rxmsg);
+	if(msg != NULL)
+	    nni_msg_free(msg);
+	if (p->rxmsg != NULL)
+	    nni_msg_free(p->rxmsg);
 	msg = NULL;
 	p->rxmsg = NULL;
 	nni_pipe_bump_error(p->npipe, rv);

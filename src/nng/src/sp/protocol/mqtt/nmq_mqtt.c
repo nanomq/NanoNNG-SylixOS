@@ -957,7 +957,7 @@ nano_ctx_recv(void *arg, nni_aio *aio)
 {
 	nano_ctx  *ctx = arg;
 	nano_sock *s   = ctx->sock;
-	nano_pipe *p;
+	nano_pipe *p = NULL;
 	// size_t     len;
 	nni_msg *msg = NULL;
 
