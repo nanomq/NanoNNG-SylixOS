@@ -271,7 +271,7 @@ nano_pipe_timer_cb(void *arg)
 				nano_msg_set_dup(rmsg);
 				// we use pipe as packet id here
 				nni_aio_set_prov_data(
-				    &p->aio_send, (void *) pid);
+				    &p->aio_send, (void *) (uintptr_t)pid);
 				// put original msg into sending
 				nni_aio_set_msg(&p->aio_send, msg);
 				log_trace(
@@ -895,7 +895,7 @@ nano_pipe_close(void *arg)
 			nni_lmq_put(&s->waitlmq, msg);
 		}
 	}
-	ni_mtx_unlock(&p->lk);
+	nni_mtx_unlock(&p->lk);
 	nni_mtx_unlock(&s->lk);
 	return 0;
 }
@@ -1063,7 +1063,8 @@ nano_pipe_recv_cb(void *arg)
 		// extract sub id
 		// Store Subid RAP Topic for sub
 		nni_mtx_lock(&p->lk);
-		nmq_subinfo_decode(msg, &npipe->subinfol, cparam->pro_ver);
+		if (nmq_subinfo_decode(msg, &npipe->subinfol, cparam->pro_ver) != 0)
+		    log_error("sub decoder failed!!");
 		nni_mtx_unlock(&p->lk);
 
 		if (cparam->pro_ver == MQTT_PROTOCOL_VERSION_v5) {
@@ -1079,7 +1080,8 @@ nano_pipe_recv_cb(void *arg)
 		// extract sub id
 		// Remove Subid RAP Topic stored
 		nni_mtx_lock(&p->lk);
-		nmq_unsubinfo_decode(msg, &npipe->subinfol, cparam->pro_ver);
+		if (nmq_unsubinfo_decode(msg, &npipe->subinfol, cparam->pro_ver) != 0)
+		    log_error("sub decoder failed!!");
 		nni_mtx_unlock(&p->lk);
 
 		if (cparam->pro_ver == MQTT_PROTOCOL_VERSION_v5) {
